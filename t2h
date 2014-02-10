@@ -21,7 +21,12 @@
 #   February 2012
 #
 
+# cleaned up and hacked on by Peter Palfrader
+# Copyright 2014 Peter Palfrader
+
 use strict;
+use IPC::Run;
+use English;
 
 
 #------------------------------------------------------------------------------
@@ -29,27 +34,12 @@ use strict;
 #   RUN EXTERNAL COMMAND VIA BOURNE SHELL
 #
 
-sub run_command (@) {
-    my $origcmdline = join(" ", grep {defined} @_);
-    return if $origcmdline eq "";
-
-    my $cmdline = $origcmdline;
-    $cmdline =~ s/(["\\])/\\$1/g;
-    $cmdline = qq{/bin/sh -c "($cmdline) 2>&1"};
-
-    my $output = `$cmdline`;
-
-    my ($exit_value, $signal_num, $dumped_core) = ($?>>8, $?&127, $?&128);
-    $exit_value == 0 or die
-      "FAILED: $origcmdline\n" .
-      "   \$! = $!\n" .
-      "   \$@ = $@\n" .
-      "   EXIT_VALUE = $exit_value\n" .
-      "   SIGNAL_NUM = $signal_num\n" .
-      "   DUMPED_CORE = $dumped_core\n" .
-      "   OUTPUT = $output\n";
-
-    return $output;
+sub run_cmd {
+    unless (IPC::Run::run(@_)) {
+        my $cmd = join(' ', @_);
+        my ($exit_value) = $?>>8;
+        die ("Command $cmd exited with $exit_value\n");
+    }
 }
 
 
@@ -126,28 +116,26 @@ sub tex_to_html ($$) {
     open(TEX, '>', "$file.tex") and print TEX $tex_input and close(TEX)
         or die "$file.tex: can't write";
 
-    run_command(
+    run_cmd([
         "pdflatex",
         "-halt-on-error",
         "-output-directory=/tmp",
         "-output-format=pdf",
-        "$file.tex",
-        ">$file.err 2>&1"
-    );
-
+        "$file.tex"
+        ], '>', '/dev/null');
 
     # --- Convert PDF to PNM using Ghostscript.
 
-    run_command(
+    run_cmd([
         "gs",
-        "-q -dNOPAUSE -dBATCH",
+        "-q", "-dNOPAUSE", "-dBATCH",
         "-dTextAlphaBits=$render_antialias_bits",
         "-dGraphicsAlphaBits=$render_antialias_bits",
         "-r$render_dpi",
         "-sDEVICE=pnmraw",
         "-sOutputFile=$file.pnm",
         "$file.pdf"
-    );
+        ]);
 
     my ($img_width, $img_height) = pnm_width_height("$file.pnm");
     #print "# img_width=$img_width\n";
@@ -187,7 +175,12 @@ sub tex_to_html ($$) {
 
     # --- Crop bottom, then measure how much was cropped.
 
-    run_command("pnmcrop -white -bottom $file.pnm >$file.bottomcrop.pnm");
+    run_cmd([
+        "pnmcrop",
+        "-white",
+        "-bottom",
+        "$file.pnm"
+        ], '>', "$file.bottomcrop.pnm");
 
     my ($img_width_bottomcrop, $img_height_bottomcrop) =
         pnm_width_height("$file.bottomcrop.pnm");
@@ -199,7 +192,11 @@ sub tex_to_html ($$) {
 
     # --- Crop top and sides, then measure how much was cropped from the top.
 
-    run_command("pnmcrop -white $file.bottomcrop.pnm >$file.crop.pnm");
+    run_cmd([
+        "pnmcrop",
+        "-white",
+        "$file.bottomcrop.pnm"
+        ], '>', "$file.crop.pnm");
 
     my ($cropped_img_width, $cropped_img_height) =
         pnm_width_height("$file.crop.pnm");
@@ -246,16 +243,15 @@ sub tex_to_html ($$) {
 
     # --- Pad the final image.
 
-    run_command(
+    run_cmd([
         "pnmpad",
         "-white",
         "-bottom=$bottom_padding",
         "-top=$top_padding",
         "-left=$left_padding",
         "-right=$right_padding",
-        "$file.crop.pnm",
-        ">$file.pad.pnm"
-    );
+        "$file.crop.pnm"
+        ], '>', "$file.pad.pnm");
 
 
     # --- Sanity check of final size.
@@ -273,13 +269,13 @@ sub tex_to_html ($$) {
     my $final_png_width  = $final_pnm_width  / $render_oversample;
     my $final_png_height = $final_pnm_height / $render_oversample;
 
-    run_command(
-        "cat $file.pad.pnm",
-        "| ppmtopgm",
-        "| pamscale -reduce $render_oversample",
-        "| pnmgamma .3",
-        "| pnmtopng -compression=9",
-        "> $file.png"
+    run_cmd(
+        [qw{ppmtopgm}], '<', "$file.pad.pnm",
+        # "| pamscale -reduce $render_oversample",
+        '|', ['pnmscale', '-reduce', $render_oversample],
+        '|', [qw{pnmgamma .3"}],
+        '|', [qw{pnmtopng -compression 9"}],
+        '>', "$file.png"
     );
 
 
@@ -317,12 +313,6 @@ sub tex_to_html ($$) {
 
 
     # --- Clean up and return result to caller.
-
-    run_command(
-        "rm -f",
-        "${file}{.*,}.{tex,aux,dvi,err,log,dimensions,pdf,pnm,png}"
-    );
-
     return $html;
 }
 
