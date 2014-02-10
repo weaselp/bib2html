@@ -25,40 +25,88 @@
 # Copyright 2014 Peter Palfrader
 
 use strict;
-use IPC::Run;
 use English;
+use File::Temp;
+use IPC::Run;
 
+my $TEX_TEMPLATE = '\documentclass[10pt]{article}
+\pagestyle{empty}
+\setlength{\topskip}{0pt}
+\setlength{\parindent}{0pt}
+\setlength{\abovedisplayskip}{0pt}
+\setlength{\belowdisplayskip}{0pt}
 
-#------------------------------------------------------------------------------
-#
-#   RUN EXTERNAL COMMAND VIA BOURNE SHELL
-#
+\usepackage{geometry}
 
+\usepackage{amsmath}
+
+\newsavebox{\snippetbox}
+\newlength{\snippetwidth}
+\newlength{\snippetheight}
+\newlength{\snippetdepth}
+\newlength{\pagewidth}
+\newlength{\pageheight}
+\newlength{\pagemargin}
+
+\begin{lrbox}{\snippetbox}%
+$<SNIPPET>$%
+\end{lrbox}
+
+\settowidth{\snippetwidth}{\usebox{\snippetbox}}
+\settoheight{\snippetheight}{\usebox{\snippetbox}}
+\settodepth{\snippetdepth}{\usebox{\snippetbox}}
+
+\setlength\pagemargin{4pt}
+
+\setlength\pagewidth\snippetwidth
+\addtolength\pagewidth\pagemargin
+\addtolength\pagewidth\pagemargin
+
+\setlength\pageheight\snippetheight
+\addtolength{\pageheight}{\snippetdepth}
+\addtolength\pageheight\pagemargin
+\addtolength\pageheight\pagemargin
+
+\newwrite\foo
+\immediate\openout\foo=\jobname.dimensions
+  \immediate\write\foo{snippetdepth = \the\snippetdepth}
+  \immediate\write\foo{snippetheight = \the\snippetheight}
+  \immediate\write\foo{snippetwidth = \the\snippetwidth}
+  \immediate\write\foo{pagewidth = \the\pagewidth}
+  \immediate\write\foo{pageheight = \the\pageheight}
+  \immediate\write\foo{pagemargin = \the\pagemargin}
+\closeout\foo
+
+\geometry{paperwidth=\pagewidth,paperheight=\pageheight,margin=\pagemargin}
+
+\begin{document}%
+\usebox{\snippetbox}%
+\end{document}
+';
+my %HTML_CACHE;
+
+sub flat {
+  map { ref $_ ? flat(@{$_}) : $_ } @_;
+}
+
+# run external command
 sub run_cmd {
+    #print STDERR "Running ", join(' ', flat @_), "\n";
     unless (IPC::Run::run(@_)) {
-        my $cmd = join(' ', @_);
+        my $cmd = join(' ', flat @_);
         my ($exit_value) = $?>>8;
         die ("Command $cmd exited with $exit_value\n");
     }
 }
 
-
-#------------------------------------------------------------------------------
-#
-#   ROUND NUMBER UP TO THE NEXT HIGHER MULTIPLE
-#
-
+# round number up to the next higher multiple
 sub round_up ($$) {
     my ($num, $mod) = @_;
     return $num + ($num % $mod == 0?  0 : ($mod - ($num % $mod)));
 }
 
 
-#------------------------------------------------------------------------------
-#
-#   FETCH WIDTH AND HEIGHT FROM PNM FILE
-#
-
+# fetch width and height from pnm file
 sub pnm_width_height ($) {
     my ($filename) = @_;
     $filename =~ m/\.pnm$/ or die "$filename: not .pnm";
@@ -76,16 +124,11 @@ sub pnm_width_height ($) {
 }
 
 
-#------------------------------------------------------------------------------
-#
-#  COMPILE LATEX SNIPPET INTO HTML
-#
-#  This routine caches results in the /tmp directory.  Snippets are named and
-#  indexed by their SHA-1 hash.
-#
+# compile latex snippet into htmL
+sub tex_to_html ($) {
+    my ($tex_snippet) = @_;
 
-sub tex_to_html ($$) {
-    my ($tex_template, $tex_snippet) = @_;
+    return $HTML_CACHE{$tex_snippet} if (exists $HTML_CACHE{$tex_snippet});
 
     my $render_antialias_bits = 4;
     my $render_oversample = 4;
@@ -93,39 +136,24 @@ sub tex_to_html ($$) {
     my $oversample = $render_oversample * $display_oversample;
     my $render_dpi = 96*1.2 * 72.27/72 * $oversample;  # This is 1850.112 dpi.
 
+    my $tmpdir = File::Temp->newdir();
+    my $file = $tmpdir.'/tth';
 
-    # --- Generate SHA-1 hash of TeX input for caching.
-
-    (my $tex_input = $tex_template) =~ s{<SNIPPET>}{$tex_snippet};
-    my $hash = do { use Digest::SHA; uc(Digest::SHA::sha1_hex($tex_input)); };
-    my $file = "/tmp/tex-$hash";
-
-
-    # --- If the image has already been compiled, then simply return the
-    #     cached result.  Otherwise, continue and create the image.
-
-    if (open(HTML, '<', "$file.html")) {
-        my $html = do { local $/; <HTML> };
-        close(HTML);
-        return $html;
-    }
-
+    (my $tex_input = $TEX_TEMPLATE) =~ s{<SNIPPET>}{$tex_snippet};
 
     # --- Write TeX source and compile to PDF.
-
     open(TEX, '>', "$file.tex") and print TEX $tex_input and close(TEX)
         or die "$file.tex: can't write";
 
     run_cmd([
         "pdflatex",
         "-halt-on-error",
-        "-output-directory=/tmp",
+        "-output-directory=$tmpdir",
         "-output-format=pdf",
         "$file.tex"
         ], '>', '/dev/null');
 
     # --- Convert PDF to PNM using Ghostscript.
-
     run_cmd([
         "gs",
         "-q", "-dNOPAUSE", "-dBATCH",
@@ -138,9 +166,6 @@ sub tex_to_html ($$) {
         ]);
 
     my ($img_width, $img_height) = pnm_width_height("$file.pnm");
-    #print "# img_width=$img_width\n";
-    #print "# img_height=$img_height\n";
-    #print "# \n";
 
 
     # --- Read dimensions file written by TeX during processing.
@@ -172,9 +197,7 @@ sub tex_to_html ($$) {
     #foreach (keys %$dimensions) { print "# $_=$dimensions->{$_}px\n"; }
     #print "# \n";
 
-
     # --- Crop bottom, then measure how much was cropped.
-
     run_cmd([
         "pnmcrop",
         "-white",
@@ -191,7 +214,6 @@ sub tex_to_html ($$) {
 
 
     # --- Crop top and sides, then measure how much was cropped from the top.
-
     run_cmd([
         "pnmcrop",
         "-white",
@@ -208,7 +230,6 @@ sub tex_to_html ($$) {
 
     # --- Pad image with specific values on all four sides, in preparation for
     #     downsampling.
-
     # Calculate bottom padding.
     my $snippet_depth =
         int($dimensions->{snippetdepth} + $dimensions->{pagemargin} + .5)
@@ -300,17 +321,17 @@ sub tex_to_html ($$) {
     };
     #$png_data_base64 =~ s/\s+//g;
 
-    my $html =
-        qq{<img\n} .
-        qq{ width=$html_img_width} .
-        qq{ height=$html_img_height} .
-        qq{ style="vertical-align:${html_img_vertical_align}px;"} .
-        qq{ title="$html_img_title"} .
-        qq{ src="data:image/png;base64,\n$png_data_base64" />};
+    my $html = sprintf(
+        '<img '.
+            'width=%d '.
+            'height=%d '.
+            'style="vertical-align:%dpx;" '.
+            'title="%s" '.
+            'src="data:image/png;base64,%s" '.
+            '/>',
+        $html_img_width, $html_img_height, $html_img_vertical_align, $html_img_title, $png_data_base64);
 
-    open(HTML, '>', "$file.html") and print HTML $html and close(HTML)
-        or die "$file.html: can't write";
-
+    $HTML_CACHE{$tex_snippet} = $html;
 
     # --- Clean up and return result to caller.
     return $html;
@@ -319,18 +340,17 @@ sub tex_to_html ($$) {
 
 
 #------------------------------------------------------------------------------
-#
-#   MAIN CONTROL
-#
+# main control
+#------------------------------------------------------------------------------
 
 binmode(STDIN,  ":utf8");
 binmode(STDOUT, ":utf8");
 binmode(STDERR, ":utf8");
 
-my $tex_template = do { local $/; <DATA> };
-my $input = do { local $/; <STDIN> };
 
-(my $html = $input) =~ s{\$(.*?)\$}{tex_to_html($tex_template,$1)}seg;
+
+my $input = do { local $/; <STDIN> };
+(my $html = $input) =~ s{\$(.*?)\$}{tex_to_html($1)}seg;
 
 $html =~ s{([^\s<>]*<img.*?>[^\s<>]*)}
           {<span style="white-space:nowrap;">$1</span>}sg;
@@ -354,64 +374,3 @@ $html
 EOT
 
 exit(0);
-
-
-#------------------------------------------------------------------------------
-#
-#   LATEX TEMPLATE
-#
-
-__DATA__
-\documentclass[10pt]{article}
-\pagestyle{empty}
-\setlength{\topskip}{0pt}
-\setlength{\parindent}{0pt}
-\setlength{\abovedisplayskip}{0pt}
-\setlength{\belowdisplayskip}{0pt}
-
-\usepackage{geometry}
-
-\usepackage{amsmath}
-
-\newsavebox{\snippetbox}
-\newlength{\snippetwidth}
-\newlength{\snippetheight}
-\newlength{\snippetdepth}
-\newlength{\pagewidth}
-\newlength{\pageheight}
-\newlength{\pagemargin}
-
-\begin{lrbox}{\snippetbox}%
-$<SNIPPET>$%
-\end{lrbox}
-
-\settowidth{\snippetwidth}{\usebox{\snippetbox}}
-\settoheight{\snippetheight}{\usebox{\snippetbox}}
-\settodepth{\snippetdepth}{\usebox{\snippetbox}}
-
-\setlength\pagemargin{4pt}
-
-\setlength\pagewidth\snippetwidth
-\addtolength\pagewidth\pagemargin
-\addtolength\pagewidth\pagemargin
-
-\setlength\pageheight\snippetheight
-\addtolength{\pageheight}{\snippetdepth}
-\addtolength\pageheight\pagemargin
-\addtolength\pageheight\pagemargin
-
-\newwrite\foo
-\immediate\openout\foo=\jobname.dimensions
-  \immediate\write\foo{snippetdepth = \the\snippetdepth}
-  \immediate\write\foo{snippetheight = \the\snippetheight}
-  \immediate\write\foo{snippetwidth = \the\snippetwidth}
-  \immediate\write\foo{pagewidth = \the\pagewidth}
-  \immediate\write\foo{pageheight = \the\pageheight}
-  \immediate\write\foo{pagemargin = \the\pagemargin}
-\closeout\foo
-
-\geometry{paperwidth=\pagewidth,paperheight=\pageheight,margin=\pagemargin}
-
-\begin{document}%
-\usebox{\snippetbox}%
-\end{document}
