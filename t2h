@@ -256,8 +256,7 @@ sub tex_to_html ($) {
 
     my $padded_img_width = round_up($cropped_img_width, $oversample);
     my $left_padding = int(($padded_img_width - $cropped_img_width) / 2);
-    my $right_padding = ($padded_img_width - $cropped_img_width)
-                        - $left_padding;
+    my $right_padding = ($padded_img_width - $cropped_img_width) - $left_padding + 16;
     #printf "# Padding left = $left_padding pixels\n";
     #printf "# Padding right = $right_padding pixels\n";
 
