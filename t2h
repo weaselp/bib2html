@@ -113,8 +113,7 @@ sub pnm_width_height ($) {
 
     open(PNM, '<', $filename) or die "$filename: can't read";
     my $line = <PNM>;  # Skip first line.
-    do { $line = <PNM> }
-        while $line =~ m/^#/;  # Read next line, skipping comments
+    do { $line = <PNM> } while $line =~ m/^#/;  # Read next line, skipping comments
     close(PNM);
 
     my ($width, $height) = ($line =~ m/^(\d+)\s+(\d+)$/);
@@ -205,8 +204,7 @@ sub tex_to_html ($) {
         "$file.pnm"
         ], '>', "$file.bottomcrop.pnm");
 
-    my ($img_width_bottomcrop, $img_height_bottomcrop) =
-        pnm_width_height("$file.bottomcrop.pnm");
+    my ($img_width_bottomcrop, $img_height_bottomcrop) = pnm_width_height("$file.bottomcrop.pnm");
 
     my $bottomcrop = $img_height - $img_height_bottomcrop;
     #printf "# Cropping bottom:  %d pixels - %d pixels = %d pixels cropped\n",
@@ -220,8 +218,7 @@ sub tex_to_html ($) {
         "$file.bottomcrop.pnm"
         ], '>', "$file.crop.pnm");
 
-    my ($cropped_img_width, $cropped_img_height) =
-        pnm_width_height("$file.crop.pnm");
+    my ($cropped_img_width, $cropped_img_height) = pnm_width_height("$file.crop.pnm");
 
     my $topcrop = $img_height_bottomcrop - $cropped_img_height;
     #printf "# Cropping top:  %d pixels - %d pixels = %d pixels cropped\n",
@@ -231,9 +228,7 @@ sub tex_to_html ($) {
     # --- Pad image with specific values on all four sides, in preparation for
     #     downsampling.
     # Calculate bottom padding.
-    my $snippet_depth =
-        int($dimensions->{snippetdepth} + $dimensions->{pagemargin} + .5)
-            - $bottomcrop;
+    my $snippet_depth = int($dimensions->{snippetdepth} + $dimensions->{pagemargin} + .5) - $bottomcrop;
     my $padded_snippet_depth = round_up($snippet_depth, $oversample);
     my $increase_snippet_depth = $padded_snippet_depth - $snippet_depth;
     my $bottom_padding = $increase_snippet_depth;
@@ -243,11 +238,8 @@ sub tex_to_html ($) {
 
     # --- Next calculate top padding, which depends on bottom padding.
 
-    my $padded_img_height = round_up(
-        $cropped_img_height + $bottom_padding,
-        $oversample);
-    my $top_padding =
-        $padded_img_height - ($cropped_img_height + $bottom_padding);
+    my $padded_img_height = round_up($cropped_img_height + $bottom_padding, $oversample);
+    my $top_padding = $padded_img_height - ($cropped_img_height + $bottom_padding);
     #printf "# Padding top:  %d pixels + %d pixels = %d pixels\n",
     #    $cropped_img_height, $top_padding, $padded_img_height;
 
@@ -276,12 +268,9 @@ sub tex_to_html ($) {
 
     # --- Sanity check of final size.
 
-    my ($final_pnm_width, $final_pnm_height) =
-        pnm_width_height("$file.pad.pnm");
-    $final_pnm_width % $oversample == 0
-        or die "$final_pnm_width is not a multiple of $oversample";
-    $final_pnm_height % $oversample == 0
-        or die "$final_pnm_height is not a multiple of $oversample";
+    my ($final_pnm_width, $final_pnm_height) = pnm_width_height("$file.pad.pnm");
+    $final_pnm_width % $oversample == 0 or die "$final_pnm_width is not a multiple of $oversample";
+    $final_pnm_height % $oversample == 0 or die "$final_pnm_height is not a multiple of $oversample";
 
 
     # --- Convert PNM to PNG.
@@ -304,11 +293,9 @@ sub tex_to_html ($) {
     my $html_img_width  = $final_png_width  / $display_oversample;
     my $html_img_height = $final_png_height / $display_oversample;
 
-    my $html_img_vertical_align = sprintf("%.0f",
-        -$padded_snippet_depth / $oversample);
+    my $html_img_vertical_align = sprintf("%.0f", -$padded_snippet_depth / $oversample);
 
-    (my $html_img_title = $tex_snippet) =~
-        s{([&<>'"])}{sprintf("&#%d;",ord($1))}eg;
+    (my $html_img_title = $tex_snippet) =~ s{([&<>'"])}{sprintf("&#%d;",ord($1))}eg;
 
     my $png_data_base64 = do {
         open(PNG, '<', "$file.png") or die "$file.png: can't open";
@@ -326,7 +313,7 @@ sub tex_to_html ($) {
             'height=%d '.
             'style="vertical-align:%dpx;" '.
             'title="%s" '.
-            'src="data:image/png;base64,%s" '.
+            "src=\"data:image/png;base64,\n%s\" ".
             '/>',
         $html_img_width, $html_img_height, $html_img_vertical_align, $html_img_title, $png_data_base64);
 
