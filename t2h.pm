@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 # taken from
 # https://tex.stackexchange.com/questions/44486/pixel-perfect-vertical-alignment-of-image-rendered-tex-snippets/45621#45621
@@ -25,9 +25,24 @@
 # Copyright 2014 Peter Palfrader
 
 use strict;
+use warnings;
+use Exporter;
 use English;
 use File::Temp;
 use IPC::Run;
+use Parse::RecDescent;
+use Data::Dumper      qw( Dumper );
+
+
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
+
+$VERSION     = 0.01;
+@ISA         = qw(Exporter);
+@EXPORT      = ();
+@EXPORT_OK   = qw(math_to_htmlimg tex_to_html);
+%EXPORT_TAGS = ( DEFAULT => [qw(&math_to_htmlimg tex_to_html)] );
+
+
 
 my $TEX_TEMPLATE = '\documentclass[10pt]{article}
 \pagestyle{empty}
@@ -124,7 +139,7 @@ sub pnm_width_height ($) {
 
 
 # compile latex snippet into htmL
-sub tex_to_html ($) {
+sub math_to_htmlimg ($) {
     my ($tex_snippet) = @_;
 
     return $HTML_CACHE{$tex_snippet} if (exists $HTML_CACHE{$tex_snippet});
@@ -282,9 +297,11 @@ sub tex_to_html ($) {
         [qw{ppmtopgm}], '<', "$file.pad.pnm",
         # "| pamscale -reduce $render_oversample",
         '|', ['pnmscale', '-reduce', $render_oversample],
+            '2>', '/dev/null',
         '|', [qw{pnmgamma .3"}],
         '|', [qw{pnmtopng -compression 9"}],
-        '>', "$file.png"
+        '>', "$file.png",
+            '2>', '/dev/null'
     );
 
 
@@ -328,35 +345,126 @@ sub tex_to_html ($) {
 #------------------------------------------------------------------------------
 # main control
 #------------------------------------------------------------------------------
+my $MARKUP_MAP = {
+    'textsc' => ['<span style="font-variant: small-caps;">', '</span>'],
+    'emph' => ['<em>', '</em>'],
+};
+sub markup($$) {
+    my $how = shift;
+    my $what = shift;
 
-binmode(STDIN,  ":utf8");
-binmode(STDOUT, ":utf8");
-binmode(STDERR, ":utf8");
+    if (exists $MARKUP_MAP->{$how}) {
+        my $m = $MARKUP_MAP->{$how};
+        return $m->[0].$what.$m->[1];
+    } else {
+        warn("Unknown latex token '\\$how'.\n");
+        return $what;
+    }
+};
+
+my $CHARMAP = {
+    '\\' => "<br />",
+    ','  => ' ',
+};
+sub single_char($) {
+    my $char = shift;
+
+    return $CHARMAP->{$char} if exists $CHARMAP->{$char};
+    warn("Unknown latex token '\\$char'.\n");
+    return $char;
+};
+
+sub tex_to_html($) {
+    my ($input) = @_;
+    #(my $html = $input) =~ s{\$(.*?)\$}{math_to_htmlimg($1)}seg;
+
+    #$html =~ s{([^\s<>]*<img.*?>[^\s<>]*)}
+    #          {<span style="white-space:nowrap;">$1</span>}sg;
+
+    #return $html;
+    $::RD_HINT = 1;
+    $::RD_ERRORS = 1;
+    my $grammar = <<'    END';
+        {
+            use strict;
+            use warnings;
+        }
+
+        exprs: expr(s) { join('', @{$item[1]}); }
+
+        expr: mathblock
+            | curlyblock
+            | plaintext
+            | cmd
+            | specials
+
+        mathblock: '$' /[^\$]+/ '$' { ::math_to_htmlimg($item[2]) }
+
+        curlyblock: '{' exprs '}' { $item[2] }
+
+        plaintext: /[^\${}\\<>&~-]+/
+
+        specials: '---' { '&mdash;' }
+                | '--'  { '&ndash;' }
+                | '-'   { '-' }
+                | '&'   { '&amp;' }
+                | '<'   { '&lt;' }
+                | '>'   { '&gt;' }
+                | '~'   { '&nbsp;' }
+
+        cmd: '\\' command curlyblock { ::markup($item[2], $item[3]); }
+           | '\\' /./                { ::single_char($item[2]); }
+
+        command: /[a-zA-Z0-9_]+/
 
 
+        #parse  : expr /\Z/ { $item[1] }
+        #
+        # expr   : list
+        #
+        # list   : unary(s?) { [ $item[0] => @{ $item[1] } ] }
+        #
+        # unary  : term unary_[ $item[1] ]
+        # unary_ : '?' unary_[ [ 'postfix?' => $arg[0] ] ]
+        #        | { $arg[0] }
+        #
+        # term   : '(' expr ')' { $item[2] }
+        #        | STRING { [ string => $item[1] ] }
+        #
+        # STRING : /\w+/
 
-my $input = do { local $/; <STDIN> };
-(my $html = $input) =~ s{\$(.*?)\$}{tex_to_html($1)}seg;
 
-$html =~ s{([^\s<>]*<img.*?>[^\s<>]*)}
-          {<span style="white-space:nowrap;">$1</span>}sg;
+    END
 
-print <<EOT;
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html 
- PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
- "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title></title>
-</head>
-<body>
-<p>
-$html
-</p>
-</body>
-</html>
-EOT
+    $Parse::RecDescent::skip = '';
+    my $parser = new Parse::RecDescent($grammar);
+    my $p = $parser->exprs(\$input);
+    if ($input ne '') {
+      warn("Failed to convert tex to html at '$input'.\n");
+      $p .= $input;
+    }
+    #print Data::Dumper->Dump([$p]);
+    return $p;
 
-exit(0);
+
+#print <<EOT;
+#<?xml version="1.0" encoding="UTF-8"?>
+#<!DOCTYPE html 
+# PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+# "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+#<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+#<head>
+#<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+#<title></title>
+#</head>
+#<body>
+#<p>
+#$html
+#</p>
+#</body>
+#</html>
+#EOT
+}
+
+1;
+# vim:set et ts=4 sw=4 st=4:

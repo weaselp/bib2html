@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Text::BibTeX;
+use t2h;
+
+my $bf = $ARGV[0];
+my $bib = new Text::BibTeX::File;
+$bib->open($bf) or die "Cannot load $bf: $!\n";
+$bib->set_structure('Bib');
+
+while (my $entry = new Text::BibTeX::Entry $bib) {
+    next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
+    next unless grep( $entry->type, qw{article inproceedings masterthesis} );
+    #$entry->type 'article' || $entry->type eq 'inproceedings';
+
+    #my (@blocks, $block, $sentence);
+    #@blocks = $entry->format;
+    #@blocks = grep ($_, @blocks);
+    #print join("\n", map {join('__',@$_)} @blocks);
+    #print $entry->format_authors, "\n";
+    print tex_to_html($entry->format_authors), "\n<br>\n" if $entry->exists('authors');
+    #print "\n";
+    #print $entry->format_atitle, "\n";
+    print tex_to_html($entry->format_atitle), "\n<br>\n";
+    #print "\n";
+    #print $entry->get('abstract'), "\n";
+    print tex_to_html($entry->get('abstract')), "\n<br>\n" if $entry->exists('abstract');
+
+    #print "\n"*3;
+
+    #print tex_to_html($entry->format_atitle), "\n";
+    #print tex_to_html($entry->get('abstract')), "\n" if $entry->exists('abstract');
+    #print "\nXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
+    print "\n<hr>\n";
+}
+
+
+# vim:set et ts=4 sw=4 st=4:
