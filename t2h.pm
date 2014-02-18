@@ -436,6 +436,7 @@ sub tex_to_html($) {
 
     END
 
+    return '' if $input eq '';
     $Parse::RecDescent::skip = '';
     my $parser = new Parse::RecDescent($grammar);
     my $p = $parser->exprs(\$input);

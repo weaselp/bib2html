@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Text::BibTeX;
+use Text::Template;
 use t2h;
 
 my $bf = $ARGV[0];
@@ -10,9 +11,145 @@ my $bib = new Text::BibTeX::File;
 $bib->open($bf) or die "Cannot load $bf: $!\n";
 $bib->set_structure('Bib');
 
+package Item;
+sub new {
+    my ($class, $bibentry) = @_;
+    my $self = {'bibentry' => $bibentry};
+    bless $self, $class;
+    $self;
+}
+
+sub exists {
+    my ($self, $field) = @_;
+    return 1 if $self->{'bibentry'}->exists($field);
+    return 1 if grep {$_ eq $field} qw{f_authors f_atitle};
+    return 0;
+}
+
+sub get_plain {
+    my ($self, $field) = @_;
+
+    return $self->{'bibentry'}->get($field)
+        if ($self->{'bibentry'}->exists($field));
+
+    if ($field eq 'f_authors') {
+        return $self->{'bibentry'}->format_authors;
+    } elsif ($field eq 'f_atitle') {
+        return $self->{'bibentry'}->format_atitle;
+    }
+    return undef;
+}
+
+sub get {
+    my ($self, $field) = @_;
+    my $value = $self->get_plain($field);
+
+    return ::tex_to_html($value);
+}
+
+sub key {
+    my ($self) = @_;
+    return $self->{'bibentry'}->key;
+}
+
+package main;
+
+#sub callback {
+#    my (%data) = @_;
+#    my $key = $data{'text'};
+#    my $arg = $data{'arg'};
+#    my $entry = $arg->{'entry'};
+#
+#    if ($key =~ /^\$(.*)/) {
+#        $key = $1;
+#
+#        if ($entry->exists($key)) {
+#            my $res = $entry->get($key);
+#            return $res;
+#        }
+#    }
+#    $arg->{'err'} = "at $key";
+#    return undef;
+#
+#}
+#
+#sub do_tmpl {
+#    my ($txt, $item) = @_;
+#
+#    my $arg_data = {
+#        'err' => 0,
+#        'entry' => $item
+#    };
+#
+#    my $template = Text::Template->new(
+#        TYPE => 'STRING',
+#        SOURCE => $txt,
+#        PREPEND => q{use strict;});
+#    my $res = $template->fill_in(
+#        HASH => {'item' => $item},
+#        BROKEN => \&callback,
+#        BROKEN_ARG => $arg_data,
+#        );
+#    if ($arg_data->{'err'}) {
+#        warn("Something went wrong while filling in the template for ".$item->key.": ".$arg_data->{'err'}."\n");
+#    };
+#    return $res;
+#}
+
+sub do_tmpl {
+    my ($txt, $item, $vars) = @_;
+
+    my $h = { map { $_ => $item->exists($_) ? $item->get($_) : undef } @$vars };
+
+    my $res = Text::Template::fill_in_string(
+        $txt,
+        PREPEND => q{use strict;},
+        HASH => $h);
+    unless (defined $res) {
+        my $bibtexkey = $item->key;
+        warn "Couldn't construct template: $Text::Template::ERROR for $bibtexkey.\n";
+    };
+    return $res;
+}
+
+
+sub format_inproceedings($) {
+    my $entry = shift;
+    my @vars = qw{f_atitle f_authors booktitle pages address month year};
+
+    my $varlist = join(' ', map {'$'.$_} @vars);
+    my $template = "{ use vars qw{$varlist}; }\n";
+    $template .= <<'    EOF';
+    <strong>{$f_atitle}</strong><br />
+    <em>{$f_authors}</em><br />
+    In {$booktitle}{ if (defined($pages)) {
+        $OUT .= ", pp {$pages}";
+      }
+    }<br />
+    {$address}, {$month}, {$year}
+
+    EOF
+
+    return do_tmpl($template, $entry, \@vars);
+};
+
+my $formatters = {
+    'inproceedings' => \&format_inproceedings
+};
+
 while (my $entry = new Text::BibTeX::Entry $bib) {
     next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
-    next unless grep( $entry->type, qw{article inproceedings masterthesis} );
+    if (exists ($formatters->{$entry->type})) {
+        my $i = new Item($entry);
+        print $entry->get('pages') if $entry->exists('pages');
+        print $entry->get('pages') if $entry->exists('pages');
+        print $formatters->{$entry->type}->($i);
+    } else {
+        warn("Do not know how to format ".$entry->type.".\n");
+    }
+    next;
+    #next unless grep( $entry->type, qw{article inproceedings masterthesis} );
+
     #$entry->type 'article' || $entry->type eq 'inproceedings';
 
     #my (@blocks, $block, $sentence);
@@ -20,10 +157,11 @@ while (my $entry = new Text::BibTeX::Entry $bib) {
     #@blocks = grep ($_, @blocks);
     #print join("\n", map {join('__',@$_)} @blocks);
     #print $entry->format_authors, "\n";
-    print tex_to_html($entry->format_authors), "\n<br>\n" if $entry->exists('authors');
+    print tex_to_html($entry->format_authors), "\n<br>\n";
     #print "\n";
     #print $entry->format_atitle, "\n";
     print tex_to_html($entry->format_atitle), "\n<br>\n";
+    print tex_to_html($entry->get('booktitle')), "\n<br>\n";
     #print "\n";
     #print $entry->get('abstract'), "\n";
     print tex_to_html($entry->get('abstract')), "\n<br>\n" if $entry->exists('abstract');
