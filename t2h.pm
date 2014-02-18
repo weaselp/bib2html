@@ -346,8 +346,16 @@ sub math_to_htmlimg ($) {
 # main control
 #------------------------------------------------------------------------------
 my $MARKUP_MAP = {
-    'textsc' => ['<span style="font-variant: small-caps;">', '</span>'],
-    'emph' => ['<em>', '</em>'],
+    'textsc'   => ['<span style="font-variant: small-caps;">', '</span>'],
+    'emph'     => ['<em>', '</em>'],
+    'bibitem'  => ['<span style="color:gray; font-size:small">[', ']</span><br />'],
+    'em'       => ['<em>', '</em>'],
+    '\\'       => "<p />",
+    ','        => ' ',
+    ' '        => ' ',
+    '&'        => '&amp;',
+    'url'      => ['<a href="@@TOKEN@@">@@TOKEN@@</a>'],
+    'newblock' => '<br />',
 };
 sub markup($$) {
     my $how = shift;
@@ -355,23 +363,22 @@ sub markup($$) {
 
     if (exists $MARKUP_MAP->{$how}) {
         my $m = $MARKUP_MAP->{$how};
-        return $m->[0].$what.$m->[1];
+        if (ref($m) eq 'ARRAY') {
+            warn("missing block for $how.\n"), return "" unless defined $what;
+            if (scalar @$m == 1) {
+                my $r = $m->[0];
+                $r =~ s/\@\@TOKEN\@\@/$what/g;
+                return $r;
+            } else {
+                return $m->[0].$what.$m->[1];
+            }
+        } else {
+            return $m.(defined $what ? $what : "");
+        }
     } else {
         warn("Unknown latex token '\\$how'.\n");
         return $what;
     }
-};
-
-my $CHARMAP = {
-    '\\' => "<br />",
-    ','  => ' ',
-};
-sub single_char($) {
-    my $char = shift;
-
-    return $CHARMAP->{$char} if exists $CHARMAP->{$char};
-    warn("Unknown latex token '\\$char'.\n");
-    return $char;
 };
 
 sub tex_to_html($) {
@@ -413,9 +420,11 @@ sub tex_to_html($) {
                 | '~'   { '&nbsp;' }
 
         cmd: '\\' command curlyblock { ::markup($item[2], $item[3]); }
-           | '\\' /./                { ::single_char($item[2]); }
+           | '\\' command exprs      { ::markup($item[2], $item[3]); }
 
         command: /[a-zA-Z0-9_]+/
+               | /[&,\\]/
+               | /\s/                { " " }
 
 
         #parse  : expr /\Z/ { $item[1] }
