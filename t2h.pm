@@ -347,12 +347,14 @@ sub math_to_htmlimg ($) {
 #------------------------------------------------------------------------------
 my $MARKUP_MAP = {
     'textsc'   => ['<span style="font-variant: small-caps;">', '</span>'],
+    'sc'       => ['<span style="font-variant: small-caps;">', '</span>'],
     'emph'     => ['<em>', '</em>'],
-    'bibitem'  => ['<span style="color:gray; font-size:small">[', ']</span><br />'],
     'em'       => ['<em>', '</em>'],
+    'bibitem'  => ['<span class="bibitem">', '</span><br />'],
     '\\'       => "<p />",
     ','        => ' ',
     ' '        => ' ',
+    '/'        => '/',
     '&'        => '&amp;',
     'url'      => ['<a href="@@TOKEN@@">@@TOKEN@@</a>'],
     'newblock' => '<br />',
@@ -421,9 +423,10 @@ sub tex_to_html($) {
 
         cmd: '\\' command curlyblock { ::markup($item[2], $item[3]); }
            | '\\' command exprs      { ::markup($item[2], $item[3]); }
+           | '\\' command            { ::markup($item[2], undef); }
 
         command: /[a-zA-Z0-9_]+/
-               | /[&,\\]/
+               | /[&,\\\/]/
                | /\s/                { " " }
 
 

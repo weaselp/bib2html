@@ -61,6 +61,7 @@ sub create_bbl {
     print F << '    EOF';
     \documentclass{article}
     \bibliographystyle{plain}
+    %\bibliographystyle{acm}
     \begin{document}
     \bibliography{b2h}
     \nocite{*}
@@ -87,7 +88,7 @@ sub latex_format_bibs {
         while (<F>) {
             if (/^\\begin\{thebibliography\}/) {
                 next;
-            } elsif (/^\\bibitem\{(.*)\}/) {
+            } elsif (/^\\bibitem(?:\[.*?\])?\{(.*)\}/) {
                 $formatted->{$1} = $_;
             } elsif (/^\\end\{thebibliography\}/) {
                 last;
@@ -102,11 +103,12 @@ sub latex_format_bibs {
 my $tmpdir;
 END { chdir "/"; File::Path::remove_tree($tmpdir, {verbose => 0}) if defined ($tmpdir); }
 $tmpdir = File::Temp->newdir(CLEANUP => 0);
-chdir($tmpdir) or die ("Cannot chdir to $tmpdir.\n");
 
-open BIB, '>', BIBFILENAME or die $!;
+open BIB, '>', $tmpdir."/".BIBFILENAME or die $!;
 print BIB while (<>);
 close BIB;
+
+chdir($tmpdir) or die ("Cannot chdir to $tmpdir.\n");
 
 my $bbl = latex_format_bibs;
 #print Data::Dumper->Dump([$bbl]);
@@ -157,14 +159,15 @@ sub format_entry($) {
     my $bibtexkey = $entry->key;
     my @res;
 
-    push @res, "<li>\n";
+    push @res, "<p>\n";
+    #$bbl->{$bibtexkey} =~ s#/\}#\/ }#g;
+    #$bbl->{$bibtexkey} =~ s#\\/#fo#g;
     push @res, tex_to_html($bbl->{$bibtexkey});
     if ($entry->exists('abstract')) {
-        push @res, '<span style="padding-left: 20px; padding-top:10px; display:block">';
+        push @res, '<div class="abstract"><p />';
         push @res, $entry->get('abstract');
-        push @res, '</span>';
+        push @res, '</div>';
     };
-    push @res, "</li>\n";
 
     return join("\n", @res);
 };
@@ -207,6 +210,12 @@ print <<EOF;
  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
+<style>
+div.abstract {padding-left:20px;}
+.bibitem:before { content: "["; }
+.bibitem:after { content: "]"; }
+.bibitem { color:gray; font-size:small;"}
+</style>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title></title>
 </head>
@@ -215,19 +224,15 @@ EOF
 for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
     my $i = $entries->{$key};
     if ($prev_year ne $i->{'year'}) {
-        print "</ul>" if defined $prev_year;
         $prev_year = $i->{'year'};
         print "<h2>$prev_year</h2>\n";
-        print "<ul>"
     };
     print $i->{'html'};
 }
-print "</ul>" if defined $prev_year;
 print <<EOF;
 </p>
 </body>
 </html>
 EOF
-print "</ul>\n";
 
 # vim:set et ts=4 sw=4 st=4:
