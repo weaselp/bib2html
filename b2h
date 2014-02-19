@@ -9,6 +9,8 @@ use Text::BibTeX;
 use t2h;
 use Data::Dumper;
 
+my $DO_SELECTED_ONLY = 1;
+
 package Item;
 
 sub new {
@@ -203,6 +205,12 @@ while (my $entry = new Text::BibTeX::Entry $bib) {
 
     my $i = new Item($entry);
     $entries->{$i->key} = $h;
+
+    my $is_selected = $i->exists('www_selected') && $i->get_plain('www_selected');
+    if ($DO_SELECTED_ONLY && !$is_selected) {
+        delete $entries->{$i->key};
+        next;
+    };
 
     my $year = $i->exists('year') ? $i->get_plain('year') : "unspecified";
     my $month = $i->exists('month') ? $month2number{$i->get_plain('month')} : undef;
