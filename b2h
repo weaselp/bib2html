@@ -169,6 +169,7 @@ sub format_entry($) {
     my $entry = shift;
 
     my $bibtexkey = $entry->key;
+    my $htmlkey = tex_to_html($bibtexkey);
     my @res;
 
     push @res, "<p>\n";
@@ -179,6 +180,26 @@ sub format_entry($) {
         push @res, '<div class="abstract"><p />';
         push @res, $entry->get('abstract');
         push @res, '</div>';
+    };
+    my @misc;
+    if ($entry->exists('www_links')) {
+        for my $line (split /\s*\|\s*/, $entry->get_plain('www_links')) {
+            my ($desc, $link) = split(/:/, $line, 2);
+            if ($desc eq "raw") {
+                push @misc, $link;
+            } elsif (defined $link) {
+                push @misc, sprintf('<a href="%s">%s</a>', $link, $desc);
+            } else {
+                warn("Undefined link for $desc in $bibtexkey.\n");
+            }
+        }
+    };
+    if ($entry->exists('doi')) {
+        my $doi = $entry->get_plain('doi');
+        push @misc, sprintf('<a class="doi" href="http://dx.doi.org/%s">%s</a>', $doi, $doi);
+    };
+    if (scalar @misc) {
+        push @res, '<span class="misc">', join("; ", @misc), '</span>';
     };
 
     return join("\n", @res);
@@ -232,7 +253,10 @@ print <<EOF;
 div.abstract {padding-left:20px;}
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
-.bibitem { color:gray; font-size:small;"}
+.bibitem { color:gray; font-size:small;}
+a.doi:before { content: "doi:"; }
+a.doi { color:gray; font-family:"monospace"}
+.misc { font-size:small;}
 </style>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title></title>

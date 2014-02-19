@@ -346,7 +346,7 @@ sub math_to_htmlimg ($) {
 # main control
 #------------------------------------------------------------------------------
 my $MARKUP_MAP = {
-    'bibitem'  => ['<span class="bibitem" id="@@TOKEN@@">@@TOKEN@@</span><br />'],
+    'bibitem'  => ['<a class="bibitem" id="@@TOKEN@@" href="#@@TOKEN@@">@@TOKEN@@</a><br />'],
     'textsc'   => ['<span style="font-variant: small-caps;">', '</span>'],
     'textbf'   => ['<strong>', '</strong>'],
     'sc'       => ['<span style="font-variant: small-caps;">', '</span>'],
