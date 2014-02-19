@@ -326,13 +326,14 @@ sub math_to_htmlimg ($) {
 
     my $html = sprintf(
         '<img '.
-            'width=%d '.
-            'height=%d '.
+            'width="%d" '.
+            'height="%d" '.
             'style="vertical-align:%dpx;" '.
             'title="%s" '.
+            'alt="%s" '.
             "src=\"data:image/png;base64,\n%s\" ".
             '/>',
-        $html_img_width, $html_img_height, $html_img_vertical_align, $html_img_title, $png_data_base64);
+        $html_img_width, $html_img_height, $html_img_vertical_align, $html_img_title, $html_img_title, $png_data_base64);
 
     $HTML_CACHE{$tex_snippet} = $html;
 
@@ -352,7 +353,7 @@ my $MARKUP_MAP = {
     'sc'       => ['<span style="font-variant: small-caps;">', '</span>'],
     'emph'     => ['<em>', '</em>'],
     'em'       => ['<em>', '</em>'],
-    '\\'       => "<p />",
+    '\\'       => "<br /><br />",
     ','        => ' ',
     ' '        => ' ',
     '/'        => '/',

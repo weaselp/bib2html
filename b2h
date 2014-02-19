@@ -177,9 +177,9 @@ sub format_entry($) {
     #$bbl->{$bibtexkey} =~ s#\\/#fo#g;
     push @res, tex_to_html($bbl->{$bibtexkey});
     if ($entry->exists('abstract')) {
-        push @res, '<div class="abstract"><p />';
+        push @res, '<br /><span class="abstract">';
         push @res, $entry->get('abstract');
-        push @res, '</div>';
+        push @res, '</span>';
     };
     my @misc;
     if ($entry->exists('www_links')) {
@@ -188,7 +188,7 @@ sub format_entry($) {
             if ($desc eq "raw") {
                 push @misc, $link;
             } elsif (defined $link) {
-                push @misc, sprintf('<a href="%s">%s</a>', $link, $desc);
+                push @misc, sprintf('<a href="%s">%s</a>', tex_to_html($link), tex_to_html($desc));
             } else {
                 warn("Undefined link for $desc in $bibtexkey.\n");
             }
@@ -201,6 +201,7 @@ sub format_entry($) {
     if (scalar @misc) {
         push @res, '<span class="misc">', join("; ", @misc), '</span>';
     };
+    push @res, "</p>\n";
 
     return join("\n", @res);
 };
@@ -249,8 +250,8 @@ print <<EOF;
  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
-<style>
-div.abstract {padding-left:20px;}
+<style type="text/css">
+.abstract {padding-left:20px; padding-top:20px; padding-bottom:20px; display:block}
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
 .bibitem { color:gray; font-size:small;}
@@ -258,7 +259,7 @@ a.doi:before { content: "doi:"; }
 a.doi { color:gray; font-family:"monospace"}
 .misc { font-size:small;}
 </style>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title></title>
 </head>
 <body>
@@ -272,7 +273,6 @@ for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } k
     print $i->{'html'};
 }
 print <<EOF;
-</p>
 </body>
 </html>
 EOF
