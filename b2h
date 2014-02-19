@@ -97,6 +97,16 @@ sub latex_format_bibs {
             }
         };
     };
+    for my $k (keys %$formatted) {
+        my @tokens = split /\\newblock/, $formatted->{$k};
+        if (scalar @tokens >= 2) {
+            my $t1 = shift @tokens;
+            my $t2 = shift @tokens;
+            my ($bibkey, $rest) = split(/\n/, $t1, 2);
+            $formatted->{$k} = sprintf("%s \n ".'\textbf{%s} \newblock %s \newblock %s',
+                $bibkey, $t2, $rest, join('\newblock', @tokens));
+        }
+    }
     return $formatted;
 }
 
