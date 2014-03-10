@@ -1,10 +1,11 @@
 #!/usr/bin/perl
 
-# taken from
+# based on code taken from
 # https://tex.stackexchange.com/questions/44486/pixel-perfect-vertical-alignment-of-image-rendered-tex-snippets/45621#45621
 # on 2014-02-10
 # user contributions licensed under cc by-sa 3.0 with attribution required
-
+#
+# Further updates, Copyright (c) 2014 Peter Palfrader, under CC BY-SA 3.0
 
 #==============================================================================
 #
