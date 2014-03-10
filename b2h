@@ -9,9 +9,8 @@ use Text::BibTeX;
 use t2h;
 use Data::Dumper;
 use HTML::Entities;
+use Getopt::Long;
 
-
-my $DO_SELECTED_ONLY = 1;
 
 package Item;
 
@@ -74,6 +73,19 @@ sub print_s {
 package main;
 
 use constant BIBFILENAME => 'b2h.bib';
+my $MONTH2NUMBER = {
+                'January'   =>  1,
+                'February'  =>  2,
+                'March'     =>  3,
+                'April'     =>  4,
+                'May'       =>  5,
+                'June'      =>  6,
+                'July'      =>  7,
+                'August'    =>  8,
+                'September' =>  9,
+                'October'   => 10,
+                'November'  => 11,
+                'December'  => 12 };
 
 sub htmlize {
     my ($txt) = @_;
@@ -119,7 +131,7 @@ sub sanitize_key($) {
     return $k;
 }
 
-sub latex_format_bibs {
+sub html_format_bibs {
     create_bbl;
     my $bblitems = {};
     open F, "<", 'dummy.bbl' or die ("Cannot open bbl file for input: $!\n");
@@ -158,61 +170,8 @@ sub latex_format_bibs {
     return $formatted;
 }
 
-my $tmpdir;
-END { chdir "/"; File::Path::remove_tree($tmpdir, {verbose => 0}) if defined ($tmpdir); }
-$tmpdir = File::Temp->newdir(CLEANUP => 0);
-
-open BIB, '>', $tmpdir."/".BIBFILENAME or die $!;
-print BIB while (<>);
-close BIB;
-
-chdir($tmpdir) or die ("Cannot chdir to $tmpdir.\n");
-
-my $bbl = latex_format_bibs;
-#print Data::Dumper->Dump([$bbl]);
-
-my $bib = new Text::BibTeX::File;
-$bib->open(BIBFILENAME) or die "Cannot load bibfile: $!\n";
-$bib->set_structure('Bib');
-
-#sub do_tmpl {
-#    my ($txt, $item, $vars) = @_;
-#
-#    my $h = { map { $_ => $item->exists($_) ? $item->get($_) : undef } @$vars };
-#
-#    my $res = Text::Template::fill_in_string(
-#        $txt,
-#        PREPEND => q{use strict;},
-#        HASH => $h);
-#    unless (defined $res) {
-#        my $bibtexkey = $item->key;
-#        warn "Couldn't construct template: $Text::Template::ERROR for $bibtexkey.\n";
-#    };
-#    return $res;
-#}
-#
-#sub format_inproceedings($) {
-#    my $entry = shift;
-#    my @vars = qw{f_atitle f_authors booktitle pages address month year};
-#
-#    my $varlist = join(' ', map {'$'.$_} @vars);
-#    my $template = "{ use vars qw{$varlist}; }\n";
-#    $template .= <<'    EOF';
-#    <strong>{$f_atitle}</strong><br />
-#    <em>{$f_authors}</em><br />
-#    In {$booktitle}{ if (defined($pages)) {
-#        $OUT .= ", pp {$pages}";
-#      }
-#    }<br />
-#    {$address}, {$month}, {$year}
-#
-#    EOF
-#
-#    return do_tmpl($template, $entry, \@vars);
-#};
-
-sub format_entry($) {
-    my $entry = shift;
+sub entry_add_extra_info($$) {
+    my ($base_info, $entry) = @_;
 
     my $bibtexkey = $entry->key;
     my @res;
@@ -220,7 +179,7 @@ sub format_entry($) {
     my $type = $entry->type;
     my $idbibkey = sanitize_key($bibtexkey);
     push @res, "<div class=\"publication $type\">";
-    push @res, @{$bbl->{$bibtexkey}};
+    push @res, @{$base_info};
 
     my @misc;
     if ($entry->exists('www_links')) {
@@ -261,58 +220,89 @@ sub format_entry($) {
     return join("\n", @res);
 };
 
-my $entries = {};
-my %month2number = (
-    'January'   =>  1,
-    'February'  =>  2,
-    'March'     =>  3,
-    'April'     =>  4,
-    'May'       =>  5,
-    'June'      =>  6,
-    'July'      =>  7,
-    'August'    =>  8,
-    'September' =>  9,
-    'October'   => 10,
-    'November'  => 11,
-    'December'  => 12 );
+sub setup_bib {
+    my ($tmpdir) = @_;
 
-while (my $entry = new Text::BibTeX::Entry $bib) {
-    next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
-    my $h = {};
-
-    my $i = new Item($entry);
-    $entries->{$i->key} = $h;
-
-    my $is_selected = $i->exists('www_selected') && $i->get_plain('www_selected');
-    if ($DO_SELECTED_ONLY && !$is_selected) {
-        delete $entries->{$i->key};
-        next;
-    };
-
-    my $year = $i->exists('year') ? $i->get_plain('year') : "unspecified";
-    my $month = $i->exists('month') ? $month2number{$i->get_plain('month')} : undef;
-    $month = 0 unless defined $month;
-    $h->{'html'} = format_entry($i);
-    $h->{'year'} = $year;
-    $h->{'sort'} = sprintf("%s-%02d-%s", $year, $month, $i->key);
+    open BIB, '>', $tmpdir."/".BIBFILENAME or die $!;
+    print BIB while (<>);
+    close BIB;
 }
 
-my $prev_year = '';
-print <<EOF;
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html 
- PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
- "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
-<style type="text/css">
+sub open_bib {
+    my $b = new Text::BibTeX::File;
+    $b->open(BIBFILENAME) or die "Cannot load bibfile: $!\n";
+    $b->set_structure('Bib');
+    return $b;
+};
+
+sub prepare_entries {
+    my $bibentries_baseinfo = html_format_bibs;
+    my $bib = open_bib();
+    my ($params) = @_;
+    my $entries = {};
+    while (my $entry = new Text::BibTeX::Entry $bib) {
+        next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
+        my $h = {};
+
+        my $i = new Item($entry);
+        $entries->{$i->key} = $h;
+
+        my $is_selected = $i->exists('www_selected') && $i->get_plain('www_selected');
+        if (!$params->{'all'} && !$is_selected) {
+            delete $entries->{$i->key};
+            next;
+        };
+
+        my $year = $i->exists('year') ? $i->get_plain('year') : "unspecified";
+        my $month = $i->exists('month') ? $MONTH2NUMBER->{$i->get_plain('month')} : undef;
+        $month = 0 unless defined $month;
+        $h->{'html'} = entry_add_extra_info($bibentries_baseinfo->{$i->key}, $i);
+        $h->{'year'} = $year;
+        $h->{'sort'} = sprintf("%s-%02d-%s", $year, $month, $i->key);
+    }
+    return $entries;
+}
+
+
+my $params = {};
+Getopt::Long::config('bundling');
+if (!GetOptions (
+    'help'     =>  \$params->{'help'},
+    'all'      =>  \$params->{'all'},
+    'no-frame' =>  \$params->{'no-frame'},
+    'no-css'   =>  \$params->{'no-css'},
+    'no-js'    =>  \$params->{'no-js'},
+    )) {
+    die "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
+};
+if ($params->{'help'}) {
+    print "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
+    print "Options:\n";
+    print "  --all      Include all bibitems, not just those with www_selected set.\n";
+    print "  --help     Print this help.\n";
+    print "  --no-frame Do not print the html header/body frame.\n";
+    print "  --no-css   Do not print any CSS definitions.\n";
+    print "  --no-js    Do not print any JS code.\n";
+    exit(0);
+};
+
+
+my $tmpdir;
+END { chdir "/"; File::Path::remove_tree($tmpdir, {verbose => 0}) if defined ($tmpdir); }
+$tmpdir = File::Temp->newdir(CLEANUP => 0);
+
+setup_bib($tmpdir);
+chdir($tmpdir) or die ("Cannot chdir to $tmpdir.\n");
+my $entries = prepare_entries($params);
+
+my $css = << 'EOF';
 .publication:before {
   float:left;
   width:25px;
   margin-left:-25px;
   font-size:24px;
   font-weight:bold;
-  content: '\\2022';
+  content: '\2022';
 }
 .publication { margin: 10px 0 20px 30px; }
 h2.year {margin-bottom:10px}
@@ -368,25 +358,25 @@ h2.year {margin-bottom:10px}
 a.doi:before { content: "doi:"; }
 a.doi { color:gray; font-family:"monospace" }
 .misc { font-size:small;}
-</style>
+EOF
+
+my $preamble1 = << "EOF";
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+ PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+ "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title></title>
+EOF
+my $preamble2 = << "EOF";
 </head>
 <body>
 <div id="abstract_mask"></div>
 EOF
-for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
-    my $i = $entries->{$key};
-    if ($prev_year ne $i->{'year'}) {
-        $prev_year = $i->{'year'};
-        print "<h2 class=\"year\">$prev_year</h2>\n";
-    };
-    print $i->{'html'};
-}
-print <<EOF;
-</body>
-<script type="text/javascript">
-  <!--
+
+my $js = << 'EOF';
     hide_blocks();
     var visible_block = 0;
 
@@ -430,9 +420,29 @@ print <<EOF;
          }
       }
     }
-    -->
-</script>
+EOF
+
+my $postamble = << "EOF";
+</body>
 </html>
 EOF
+
+
+
+print $preamble1 unless $params->{'no-frame'};
+print '<style type="text/css">', $css, '</style>' unless $params->{'no-css'};
+print $preamble2 unless $params->{'no-frame'};
+my $prev_year = '';
+for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
+    my $i = $entries->{$key};
+    if ($prev_year ne $i->{'year'}) {
+        $prev_year = $i->{'year'};
+        print "<h2 class=\"year\">$prev_year</h2>\n";
+    };
+    print $i->{'html'};
+}
+
+print '<script type="text/javascript"> <!--', "\n", $js, ' --> </script>' unless $params->{'no-js'};
+print $postamble unless $params->{'no-frame'};
 
 # vim:set et ts=4 sw=4 st=4:
