@@ -395,7 +395,6 @@ EOF
 my $preamble2 = << "EOF";
 </head>
 <body>
-<div id="abstract_mask"></div>
 EOF
 
 my $js = << 'EOF';
@@ -454,6 +453,7 @@ EOF
 print $preamble1 unless $params->{'no-frame'};
 print '<style type="text/css">', $css, '</style>' unless $params->{'no-css'};
 print $preamble2 unless $params->{'no-frame'};
+print '<div id="abstract_mask"></div>', "\n" unless $params->{'no-js'} && $params->{'no-frame'};
 my $prev_year = '';
 for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
     my $i = $entries->{$key};
