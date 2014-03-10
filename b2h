@@ -329,9 +329,6 @@ my $css = << 'EOF';
 .publication { margin: 10px 0 20px 30px; }
 h2.year {margin-bottom:10px}
 #abstract_mask {
-  -moz-opacity: 0;
-  opacity: 0;
-  filter: alpha(opacity=0);
   z-index: 1;
   position: absolute;
   width: 100%;
