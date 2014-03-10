@@ -464,7 +464,7 @@ for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } k
     print $i->{'html'};
 }
 
-print '<script type="text/javascript"> <!--', "\n", $js, ' --> </script>' unless $params->{'no-js'};
+print '<script type="text/javascript"> /* <![CDATA[ */ ', "\n", $js, ' /* ]]> */ </script>' unless $params->{'no-js'};
 print $postamble unless $params->{'no-frame'};
 
 # vim:set et ts=4 sw=4 st=4:
