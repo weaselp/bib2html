@@ -86,6 +86,14 @@ sub trim($) {
     return $s;
 }
 
+sub sanitize_key($) {
+    my ($k) = @_;
+
+    $k =~ s/[^-A-Za-z0-9_]/_/g;
+    $k =~ s/^/bib-/;
+    return $k;
+}
+
 sub latex_format_bibs {
     create_bbl;
     my $bblitems = {};
@@ -112,11 +120,9 @@ sub latex_format_bibs {
             my $t2 = shift @tokens;
             my ($bibkey, $authors) = split(/\n/, $t1, 2);
 
-            my $htmlbibkey = $k;
-            $htmlbibkey =~ s/[^-A-Za-z0-9_]/_/g;
-            $htmlbibkey =~ s/^/bib-/;
+            my $idbibkey = sanitize_key($k);
             my $lines = [];
-            push @$lines, sprintf('<div class="bibitem"><a id="%s" href="#%s">%s</a></div>', $htmlbibkey, $htmlbibkey, trim(tex_to_html($k)));
+            push @$lines, sprintf('<div class="bibitem"><a id="%s" href="#%s">%s</a></div>', $idbibkey, $idbibkey, trim(tex_to_html($k)));
             push @$lines, sprintf('<div class="title">%s</div>', trim(tex_to_html($t2)));
             push @$lines, sprintf('<div class="authors">%s</div>', trim(tex_to_html($authors)));
             push @$lines, sprintf('<div class="reference-info">%s</div>', trim(tex_to_html(join('\newblock', @tokens))));
@@ -184,17 +190,13 @@ sub format_entry($) {
     my $entry = shift;
 
     my $bibtexkey = $entry->key;
-    my $htmlkey = tex_to_html($bibtexkey);
     my @res;
 
     my $type = $entry->type;
+    my $idbibkey = sanitize_key($bibtexkey);
     push @res, "<div class=\"publication $type\">";
     push @res, @{$bbl->{$bibtexkey}};
-    if ($entry->exists('abstract')) {
-        push @res, '<div class="abstract">';
-        push @res, $entry->get('abstract');
-        push @res, '</div>';
-    };
+
     my @misc;
     if ($entry->exists('www_links')) {
         for my $line (split /\s*\|\s*/, $entry->get_plain('www_links')) {
@@ -212,8 +214,20 @@ sub format_entry($) {
         my $doi = $entry->get_plain('doi');
         push @misc, sprintf('<a class="doi" href="http://dx.doi.org/%s">%s</a>', $doi, $doi);
     };
-    if (scalar @misc) {
-        push @res, '<div class="misc">', join(";\n", @misc), '</div>';
+
+    if (scalar @misc || $entry->exists('abstract')) {
+        push @res, '<div class="misc">';
+        if ($entry->exists('abstract')) {
+            push @res, sprintf('<div class="abstract_link"><a href="javascript:void(0)" onclick="javascript:abstract_visible(\'%s\')">abstract</a>%s</div>', $idbibkey, (scalar @misc ? ';' : ''));
+        };
+        push @res, join(";\n", @misc);
+        push @res,'</div>';
+    };
+
+    if ($entry->exists('abstract')) {
+        push @res, sprintf('<div id="abstract_%s" class="abstract">', $idbibkey);
+        push @res, $entry->get('abstract');
+        push @res, '</div>';
     };
     push @res, "</div>\n";
 
@@ -265,9 +279,43 @@ print <<EOF;
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 <style type="text/css">
-.publication {margin-bottom:20px; margin-top:10px}
+.publication:before {
+  float:left;
+  width:25px;
+  margin-left:-25px;
+  font-size:24px;
+  font-weight:bold;
+  content: '\\2022';
+}
+.publication { margin: 10px 0 20px 30px; }
 h2.year {margin-bottom:10px}
-.abstract {padding-left:20px; padding-top:10px; padding-bottom:10px; display:block}
+#abstract_mask {
+  -moz-opacity: 0;
+  opacity: 0;
+  filter: alpha(opacity=0);
+  z-index: 1;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0px;
+  left: 0px;
+  display: none;
+}
+.abstract_link { display: none; }
+.abstract {
+  padding-left:20px;
+  padding-right:20px;
+  padding-top:10px;
+  padding-bottom:10px;
+  display: block;
+  background-color: #ffffff;
+  /* display: none; */
+  /* position: absolute; */
+  /* left: 120px; */
+  /* z-index: 1; */
+  /* border: #000 1px solid; */
+  /* width: 50%; */
+}
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
 .bibitem { font-size:small; }
@@ -282,6 +330,7 @@ a.doi { color:gray; font-family:"monospace" }
 <title></title>
 </head>
 <body>
+<div id="abstract_mask"></div>
 EOF
 for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
     my $i = $entries->{$key};
@@ -293,6 +342,53 @@ for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } k
 }
 print <<EOF;
 </body>
+<script type="text/javascript">
+  <!--
+    hide_abstracts();
+    var visible_abstract = 0;
+
+    function hide_abstracts() {
+      all_divs = document.getElementsByTagName("div");
+      for (var i = 0; i < all_divs.length; i++) {
+        if (all_divs[i].className == "abstract_link") {
+          all_divs[i].style.display = "inline";
+        } else if (all_divs[i].className == "abstract") {
+          all_divs[i].style.display = "none";
+          all_divs[i].style.position = "absolute";
+          all_divs[i].style.left = "60px";
+          all_divs[i].style.zIndex = 1;
+          all_divs[i].style.border = "#000 1px solid";
+          all_divs[i].style.width = "50%";
+        }
+      }
+    }
+
+    function abstract_visible(id) {
+      var m = document.getElementById("abstract_mask");
+      if (visible_abstract) {
+        var t = document.getElementById("abstract_"+visible_abstract);
+        t.style.display = "none";
+        if (m) {
+          m.style.display = "none";
+        }
+        if (visible_abstract == id) {
+          visible_abstract = 0;
+          return;
+        }
+        visible_abstract = 0;
+      }
+      var e = document.getElementById("abstract_"+id);
+      if (e) {
+         e.style.display = "block";
+         visible_abstract = id;
+         if (m) {
+           m.onclick = function() { abstract_visible(id); };
+           m.style.display = "block";
+         }
+      }
+    }
+    -->
+</script>
 </html>
 EOF
 
