@@ -8,6 +8,8 @@ use Text::BibTeX;
 #use Text::Template;
 use t2h;
 use Data::Dumper;
+use HTML::Entities;
+
 
 my $DO_SELECTED_ONLY = 1;
 
@@ -51,10 +53,33 @@ sub get {
 sub key { return shift->{'bibentry'}->key; }
 sub type { return shift->{'bibentry'}->type; }
 
+sub print_s {
+    my ($self) = @_;
+    my $be = $self->{'bibentry'};
+    my $clone = Text::BibTeX::Entry->new;
+
+    $clone->set_metatype(&Text::BibTeX::BTE_REGULAR);
+    $clone->set_type($be->type);
+    $clone->set_key($be->key);
+    for my $k (@{$be->fieldlist}) {
+        $clone->set($k, $be->get($k));
+    }
+
+    $clone->delete(qw{owner timestamp www_links www_selected file abstract});
+    my $s = $clone->print_s;
+    $s =~ s/\n*$//;
+    return $s;
+}
 
 package main;
 
 use constant BIBFILENAME => 'b2h.bib';
+
+sub htmlize {
+    my ($txt) = @_;
+
+    return encode_entities($txt);
+}
 
 sub create_bbl {
     open F, ">", 'dummy.tex' or die ("Cannot open tex file for output: $!\n");
@@ -218,17 +243,19 @@ sub format_entry($) {
     if (scalar @misc || $entry->exists('abstract')) {
         push @res, '<div class="misc">';
         if ($entry->exists('abstract')) {
-            push @res, sprintf('<div class="abstract_link"><a href="javascript:void(0)" onclick="javascript:abstract_visible(\'%s\')">abstract</a>%s</div>', $idbibkey, (scalar @misc ? ';' : ''));
+            push @res, sprintf('<div class="block_link"><a href="javascript:void(0)" onclick="javascript:block_visible(\'abstract_%s\')">abstract</a>  &mdash; </div>', $idbibkey);
         };
-        push @res, join(";\n", @misc);
+        push @res, sprintf('<div class="block_link"><a href="javascript:void(0)" onclick="javascript:block_visible(\'bibtex_%s\')">bibtex</a>%s</div>', $idbibkey, (scalar @misc ? ' &mdash; ' : ''));
+        push @res, join(" &mdash;\n", @misc);
         push @res,'</div>';
     };
 
     if ($entry->exists('abstract')) {
-        push @res, sprintf('<div id="abstract_%s" class="abstract">', $idbibkey);
-        push @res, $entry->get('abstract');
-        push @res, '</div>';
+        push @res, sprintf('<div id="abstract_%s" class="abstract">%s</div>', $idbibkey, $entry->get('abstract'));
     };
+
+    push @res, sprintf('<div id="bibtex_%s" class="bibtex">%s</div>', $idbibkey, htmlize($entry->print_s()));
+
     push @res, "</div>\n";
 
     return join("\n", @res);
@@ -301,7 +328,7 @@ h2.year {margin-bottom:10px}
   left: 0px;
   display: none;
 }
-.abstract_link { display: none; }
+.block_link { display: none; }
 .abstract {
   padding-left:20px;
   padding-right:20px;
@@ -311,10 +338,26 @@ h2.year {margin-bottom:10px}
   background-color: #ffffff;
   /* display: none; */
   /* position: absolute; */
-  /* left: 120px; */
+  /* left: 60px; */
   /* z-index: 1; */
   /* border: #000 1px solid; */
   /* width: 50%; */
+}
+.bibtex {
+  padding-left:20px;
+  padding-right:20px;
+  padding-top:10px;
+  padding-bottom:10px;
+  display: block;
+  background-color: #ffffff;
+  font-family: "monospace";
+  font-size: small;
+  white-space: pre;
+  display: none;
+  position: absolute;
+  left: 60px;
+  z-index: 1;
+  border: #000 1px solid;
 }
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
@@ -344,13 +387,13 @@ print <<EOF;
 </body>
 <script type="text/javascript">
   <!--
-    hide_abstracts();
-    var visible_abstract = 0;
+    hide_blocks();
+    var visible_block = 0;
 
-    function hide_abstracts() {
+    function hide_blocks() {
       all_divs = document.getElementsByTagName("div");
       for (var i = 0; i < all_divs.length; i++) {
-        if (all_divs[i].className == "abstract_link") {
+        if (all_divs[i].className == "block_link") {
           all_divs[i].style.display = "inline";
         } else if (all_divs[i].className == "abstract") {
           all_divs[i].style.display = "none";
@@ -363,26 +406,26 @@ print <<EOF;
       }
     }
 
-    function abstract_visible(id) {
+    function block_visible(id) {
       var m = document.getElementById("abstract_mask");
-      if (visible_abstract) {
-        var t = document.getElementById("abstract_"+visible_abstract);
+      if (visible_block) {
+        var t = document.getElementById(visible_block);
         t.style.display = "none";
         if (m) {
           m.style.display = "none";
         }
-        if (visible_abstract == id) {
-          visible_abstract = 0;
+        if (visible_block == id) {
+          visible_block = 0;
           return;
         }
-        visible_abstract = 0;
+        visible_block = 0;
       }
-      var e = document.getElementById("abstract_"+id);
+      var e = document.getElementById(id);
       if (e) {
          e.style.display = "block";
-         visible_abstract = id;
+         visible_block = id;
          if (m) {
-           m.onclick = function() { abstract_visible(id); };
+           m.onclick = function() { block_visible(id); };
            m.style.display = "block";
          }
       }
