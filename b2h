@@ -30,7 +30,6 @@ use File::Temp;
 use Text::BibTeX;
 #use Text::Template;
 use t2h;
-use Data::Dumper;
 use HTML::Entities;
 use Getopt::Long;
 

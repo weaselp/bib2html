@@ -32,7 +32,6 @@ use English;
 use File::Temp;
 use IPC::Run;
 use Parse::RecDescent;
-use Data::Dumper      qw( Dumper );
 
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
@@ -441,7 +440,6 @@ sub tex_to_html($) {
       warn("Failed to convert tex to html at '$input'.\n");
       $p .= $input;
     }
-    #print Data::Dumper->Dump([$p]);
     return $p;
 
 
