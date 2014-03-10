@@ -48,10 +48,8 @@ sub get {
     return ::tex_to_html($value);
 }
 
-sub key {
-    my ($self) = @_;
-    return $self->{'bibentry'}->key;
-}
+sub key { return shift->{'bibentry'}->key; }
+sub type { return shift->{'bibentry'}->type; }
 
 
 package main;
@@ -81,9 +79,16 @@ sub create_bbl {
     close($oldout);
 }
 
+sub trim($) {
+    my ($s) = @_;
+    $s =~ s/^\s*//;
+    $s =~ s/\.?\s*$//;
+    return $s;
+}
+
 sub latex_format_bibs {
     create_bbl;
-    my $formatted = {};
+    my $bblitems = {};
     open F, "<", 'dummy.bbl' or die ("Cannot open bbl file for input: $!\n");
     {
         local $/="";
@@ -91,7 +96,7 @@ sub latex_format_bibs {
             if (/^\\begin\{thebibliography\}/) {
                 next;
             } elsif (/^\\bibitem(?:\[.*?\])?\{(.*)\}/) {
-                $formatted->{$1} = $_;
+                $bblitems->{$1} = $_;
             } elsif (/^\\end\{thebibliography\}/) {
                 last;
             } else {
@@ -99,14 +104,24 @@ sub latex_format_bibs {
             }
         };
     };
-    for my $k (keys %$formatted) {
-        my @tokens = split /\\newblock/, $formatted->{$k};
+    my $formatted = {};
+    for my $k (keys %$bblitems) {
+        my @tokens = split /\\newblock/, $bblitems->{$k};
         if (scalar @tokens >= 2) {
             my $t1 = shift @tokens;
             my $t2 = shift @tokens;
-            my ($bibkey, $rest) = split(/\n/, $t1, 2);
-            $formatted->{$k} = sprintf("%s \n ".'\textbf{%s} \newblock %s \newblock %s',
-                $bibkey, $t2, $rest, join('\newblock', @tokens));
+            my ($bibkey, $authors) = split(/\n/, $t1, 2);
+
+            my $htmlbibkey = $k;
+            $htmlbibkey =~ s/[^-A-Za-z0-9_]/_/g;
+            $htmlbibkey =~ s/^/bib-/;
+            my $lines = [];
+            push @$lines, sprintf('<div class="bibitem"><a id="%s" href="#%s">%s</a></div>', $htmlbibkey, $htmlbibkey, trim(tex_to_html($k)));
+            push @$lines, sprintf('<div class="title">%s</div>', trim(tex_to_html($t2)));
+            push @$lines, sprintf('<div class="authors">%s</div>', trim(tex_to_html($authors)));
+            push @$lines, sprintf('<div class="reference-info">%s</div>', trim(tex_to_html(join('\newblock', @tokens))));
+
+            $formatted->{$k} = $lines;
         }
     }
     return $formatted;
@@ -172,14 +187,13 @@ sub format_entry($) {
     my $htmlkey = tex_to_html($bibtexkey);
     my @res;
 
-    push @res, "<p>\n";
-    #$bbl->{$bibtexkey} =~ s#/\}#\/ }#g;
-    #$bbl->{$bibtexkey} =~ s#\\/#fo#g;
-    push @res, tex_to_html($bbl->{$bibtexkey});
+    my $type = $entry->type;
+    push @res, "<div class=\"publication $type\">";
+    push @res, @{$bbl->{$bibtexkey}};
     if ($entry->exists('abstract')) {
-        push @res, '<br /><span class="abstract">';
+        push @res, '<div class="abstract">';
         push @res, $entry->get('abstract');
-        push @res, '</span>';
+        push @res, '</div>';
     };
     my @misc;
     if ($entry->exists('www_links')) {
@@ -188,7 +202,7 @@ sub format_entry($) {
             if ($desc eq "raw") {
                 push @misc, $link;
             } elsif (defined $link) {
-                push @misc, sprintf('<a href="%s">%s</a>', tex_to_html($link), tex_to_html($desc));
+                push @misc, sprintf('<a href="%s">%s</a>', trim(tex_to_html($link)), trim(tex_to_html($desc)));
             } else {
                 warn("Undefined link for $desc in $bibtexkey.\n");
             }
@@ -199,9 +213,9 @@ sub format_entry($) {
         push @misc, sprintf('<a class="doi" href="http://dx.doi.org/%s">%s</a>', $doi, $doi);
     };
     if (scalar @misc) {
-        push @res, '<span class="misc">', join("; ", @misc), '</span>';
+        push @res, '<div class="misc">', join(";\n", @misc), '</div>';
     };
-    push @res, "</p>\n";
+    push @res, "</div>\n";
 
     return join("\n", @res);
 };
@@ -251,12 +265,17 @@ print <<EOF;
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 <style type="text/css">
-.abstract {padding-left:20px; padding-top:20px; padding-bottom:20px; display:block}
+.publication {margin-bottom:20px; margin-top:10px}
+h2.year {margin-bottom:10px}
+.abstract {padding-left:20px; padding-top:10px; padding-bottom:10px; display:block}
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
-.bibitem { color:gray; font-size:small;}
+.bibitem { font-size:small; }
+.bibitem a { color:gray; }
+.title { font-weight:bold; }
+.authors { font-variant: small-caps; }
 a.doi:before { content: "doi:"; }
-a.doi { color:gray; font-family:"monospace"}
+a.doi { color:gray; font-family:"monospace" }
 .misc { font-size:small;}
 </style>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -268,7 +287,7 @@ for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } k
     my $i = $entries->{$key};
     if ($prev_year ne $i->{'year'}) {
         $prev_year = $i->{'year'};
-        print "<h2>$prev_year</h2>\n";
+        print "<h2 class=\"year\">$prev_year</h2>\n";
     };
     print $i->{'html'};
 }

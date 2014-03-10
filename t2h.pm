@@ -347,7 +347,7 @@ sub math_to_htmlimg ($) {
 # main control
 #------------------------------------------------------------------------------
 my $MARKUP_MAP = {
-    'bibitem'  => ['<a class="bibitem" id="@@TOKEN@@" href="#@@TOKEN@@">@@TOKEN@@</a><br />'],
+    #'bibitem'  => ['<a class="bibitem" id="@@TOKEN@@" href="#@@TOKEN@@">@@TOKEN@@</a><br />'],
     'textsc'   => ['<span style="font-variant: small-caps;">', '</span>'],
     'textbf'   => ['<strong>', '</strong>'],
     'sc'       => ['<span style="font-variant: small-caps;">', '</span>'],
@@ -430,24 +430,6 @@ sub tex_to_html($) {
         command: /[a-zA-Z0-9_]+/
                | /[&,\\\/]/
                | /\s/                { " " }
-
-
-        #parse  : expr /\Z/ { $item[1] }
-        #
-        # expr   : list
-        #
-        # list   : unary(s?) { [ $item[0] => @{ $item[1] } ] }
-        #
-        # unary  : term unary_[ $item[1] ]
-        # unary_ : '?' unary_[ [ 'postfix?' => $arg[0] ] ]
-        #        | { $arg[0] }
-        #
-        # term   : '(' expr ')' { $item[2] }
-        #        | STRING { [ string => $item[1] ] }
-        #
-        # STRING : /\w+/
-
-
     END
 
     return '' if $input eq '';
