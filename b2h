@@ -341,7 +341,6 @@ h2.year {margin-bottom:10px}
   left: 0px;
   display: none;
 }
-.block_link { display: none; }
 .abstract {
   padding-left:20px;
   padding-right:20px;
@@ -374,7 +373,7 @@ h2.year {margin-bottom:10px}
 }
 .blocklink:before { content: "\25BE  "; }
 .blocklink:after { content: ""; }
-.blocklink { color:black; text-decoration:underline; }
+.blocklink { color:black; text-decoration:underline; display: none; }
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
 .bibitem { font-size:small; }
