@@ -25,14 +25,17 @@
 
 use strict;
 use warnings;
+use English;
 use File::Path;
 use File::Temp;
 use Text::BibTeX;
-#use Text::Template;
-use t2h;
 use HTML::Entities;
 use Getopt::Long;
 
+use File::Spec::Functions qw( catpath splitpath);
+use Cwd 'abs_path';
+use lib catpath( ( splitpath( abs_path $0 ) )[ 0, 1 ] );
+use t2h;
 
 package Item;
 
