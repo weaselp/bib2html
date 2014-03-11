@@ -371,7 +371,7 @@ h2.year {margin-bottom:10px}
 }
 .blocklink:before { content: "["; }
 .blocklink:after { content: "]"; }
-.blocklink { color:gray; text-decoration:underline; }
+.blocklink { color:black; text-decoration:underline; }
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
 .bibitem { font-size:small; }
