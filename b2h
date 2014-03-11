@@ -372,8 +372,8 @@ h2.year {margin-bottom:10px}
   z-index: 1;
   border: #000 1px solid;
 }
-.blocklink:before { content: "["; }
-.blocklink:after { content: "]"; }
+.blocklink:before { content: "\25BE  "; }
+.blocklink:after { content: ""; }
 .blocklink { color:black; text-decoration:underline; }
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
