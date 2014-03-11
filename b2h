@@ -230,9 +230,9 @@ sub entry_add_extra_info($$) {
     };
 
     if (scalar @misc) {
-        push @res, '<div class="misc">';
-        push @res, join(" &mdash;\n", @misc);
-        push @res,'</div>';
+        push @res, '<ul class="misclist">';
+        push @res, map { "<li>$_</li>\n" } @misc;
+        push @res, '</ul>';
     };
 
     if ($entry->exists('abstract')) {
@@ -383,9 +383,12 @@ h2.year {margin-bottom:10px}
 .authors { font-variant: small-caps; }
 a.doi:before { content: "doi:"; }
 a.doi { color:gray; font-family:"monospace" }
-.misc { font-size:small;}
-.misc a:before { content: "["; }
-.misc a:after { content: "]"; }
+.misclist a:before { content: "["; }
+.misclist a:after { content: "]"; }
+ul.misclist { margin: 0 0 0 0; padding-left: 0; }
+ul.misclist li:before { content: "\2014  "; }
+ul.misclist li:first-child:before { content: none; }
+ul.misclist li { display:inline; font-size:small; }
 EOF
 
 my $preamble1 = << "EOF";
