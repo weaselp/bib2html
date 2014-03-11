@@ -231,7 +231,7 @@ sub entry_add_extra_info($$) {
 
     if (scalar @misc) {
         push @res, '<ul class="misclist">';
-        push @res, map { "<li>$_</li>\n" } @misc;
+        push @res, map { "<li>$_</li>" } @misc;
         push @res, '</ul>';
     };
 
