@@ -210,7 +210,7 @@ sub entry_add_extra_info($$) {
     if ($entry->exists('abstract')) {
         push @misc, sprintf('<div class="blocklink" onclick="javascript:block_visible(\'abstract_%s\')">abstract</div>', $idbibkey);
     };
-    push @misc, sprintf('<div class="blocklink" onclick="javascript:block_visible(\'bibtex_%s\')">bibtex</div>', $idbibkey);
+    push @misc, sprintf('<div class="blocklink" onclick="javascript:block_visible(\'bibtex_%s\')">BibTeX</div>', $idbibkey);
 
     if ($entry->exists('www_links')) {
         for my $line (split /\s*\|\s*/, $entry->get_plain('www_links')) {
