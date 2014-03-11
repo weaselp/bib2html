@@ -204,6 +204,11 @@ sub entry_add_extra_info($$) {
     push @res, @{$base_info};
 
     my @misc;
+    if ($entry->exists('abstract')) {
+        push @misc, sprintf('<div class="blocklink" onclick="javascript:block_visible(\'abstract_%s\')">abstract</div>', $idbibkey);
+    };
+    push @misc, sprintf('<div class="blocklink" onclick="javascript:block_visible(\'bibtex_%s\')">bibtex</div>', $idbibkey);
+
     if ($entry->exists('www_links')) {
         for my $line (split /\s*\|\s*/, $entry->get_plain('www_links')) {
             my ($desc, $link) = split(/:/, $line, 2);
@@ -221,12 +226,8 @@ sub entry_add_extra_info($$) {
         push @misc, sprintf('<a class="doi" href="http://dx.doi.org/%s">%s</a>', $doi, $doi);
     };
 
-    if (scalar @misc || $entry->exists('abstract')) {
+    if (scalar @misc) {
         push @res, '<div class="misc">';
-        if ($entry->exists('abstract')) {
-            push @res, sprintf('<div class="block_link"><a href="javascript:void(0)" onclick="javascript:block_visible(\'abstract_%s\')">abstract</a>  &mdash; </div>', $idbibkey);
-        };
-        push @res, sprintf('<div class="block_link"><a href="javascript:void(0)" onclick="javascript:block_visible(\'bibtex_%s\')">bibtex</a>%s</div>', $idbibkey, (scalar @misc ? ' &mdash; ' : ''));
         push @res, join(" &mdash;\n", @misc);
         push @res,'</div>';
     };
@@ -368,6 +369,9 @@ h2.year {margin-bottom:10px}
   z-index: 1;
   border: #000 1px solid;
 }
+.blocklink:before { content: "["; }
+.blocklink:after { content: "]"; }
+.blocklink { color:gray; text-decoration:underline; }
 .bibitem:before { content: "["; }
 .bibitem:after { content: "]"; }
 .bibitem { font-size:small; }
@@ -377,6 +381,8 @@ h2.year {margin-bottom:10px}
 a.doi:before { content: "doi:"; }
 a.doi { color:gray; font-family:"monospace" }
 .misc { font-size:small;}
+.misc a:before { content: "["; }
+.misc a:after { content: "]"; }
 EOF
 
 my $preamble1 = << "EOF";
@@ -401,7 +407,7 @@ my $js = << 'EOF';
     function hide_blocks() {
       all_divs = document.getElementsByTagName("div");
       for (var i = 0; i < all_divs.length; i++) {
-        if (all_divs[i].className == "block_link") {
+        if (all_divs[i].className == "blocklink") {
           all_divs[i].style.display = "inline";
         } else if (all_divs[i].className == "abstract") {
           all_divs[i].style.display = "none";
