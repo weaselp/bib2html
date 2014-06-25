@@ -39,10 +39,30 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 $VERSION     = 0.01;
 @ISA         = qw(Exporter);
 @EXPORT      = ();
-@EXPORT_OK   = qw(math_to_htmlimg tex_to_html);
+@EXPORT_OK   = qw(math_to_htmlimg tex_to_html get_extra_css);
 %EXPORT_TAGS = ( DEFAULT => [qw(&math_to_htmlimg tex_to_html)] );
 
+my $extra_css = {};
+my $extra_css_ctr = 0;
 
+sub store_extra_css($) {
+    my ($def) = @_;
+    unless (exists $extra_css->{$def}) {
+        $extra_css_ctr++;
+        my $name = "t2h_style_$extra_css_ctr";
+        $extra_css->{$def} = $name;
+    }
+    return $extra_css->{$def};
+}
+
+sub get_extra_css() {
+    my @css = ();
+    for my $k (keys %$extra_css) {
+        my $val = $extra_css->{$k};
+        push @css, ".$val { $k }";
+    }
+    return join("\n", @css)."\n";
+}
 
 my $TEX_TEMPLATE = '\documentclass[10pt]{article}
 \pagestyle{empty}
@@ -324,16 +344,17 @@ sub math_to_htmlimg ($) {
     };
     #$png_data_base64 =~ s/\s+//g;
 
+    my $cssclass = store_extra_css(sprintf("vertical-align:%dpx;", $html_img_vertical_align));
     my $html = sprintf(
         '<img '.
             'width="%d" '.
             'height="%d" '.
-            'style="vertical-align:%dpx;" '.
+            'class="%s" '.
             'title="%s" '.
             'alt="%s" '.
             "src=\"data:image/png;base64,\n%s\" ".
             '/>',
-        $html_img_width, $html_img_height, $html_img_vertical_align, $html_img_title, $html_img_title, $png_data_base64);
+        $html_img_width, $html_img_height, $cssclass, $html_img_title, $html_img_title, $png_data_base64);
 
     $HTML_CACHE{$tex_snippet} = $html;
 

@@ -463,11 +463,12 @@ EOF
 
 my $css = '';
 $css .= $base_css unless $params->{'no-base-css'};
+$css .= get_extra_css();
 
 print $preamble1 unless $params->{'no-frame'};
-print '<style type="text/css">', $css, '</style>' unless $css eq '';
+print '<style type="text/css">', $css, '</style>' unless defined $params->{'ext-css'};
 print $preamble2 unless $params->{'no-frame'};
-print '<div id="abstract_mask"></div>', "\n" unless $params->{'no-frame'};
+print '<div id="abstract_mask"></div>', "\n";
 my $prev_year = '';
 for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
     my $i = $entries->{$key};
