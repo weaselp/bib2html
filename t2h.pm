@@ -463,4 +463,5 @@ sub tex_to_html($) {
 }
 
 1;
-# vim:set et ts=4 sw=4 st=4:
+
+# vim:et:ts=4:sw=4:softtabstop=4:

@@ -31,9 +31,9 @@ use File::Temp;
 use Text::BibTeX;
 use HTML::Entities;
 use Getopt::Long;
+use Cwd qw{abs_path getcwd};
 
 use File::Spec::Functions qw( catpath splitpath);
-use Cwd 'abs_path';
 use lib catpath( ( splitpath( abs_path $0 ) )[ 0, 1 ] );
 use t2h;
 
@@ -293,27 +293,30 @@ sub prepare_entries {
 my $params = {};
 Getopt::Long::config('bundling');
 if (!GetOptions (
-    'help'     =>  \$params->{'help'},
-    'all'      =>  \$params->{'all'},
-    'no-frame' =>  \$params->{'no-frame'},
-    'no-css'   =>  \$params->{'no-css'},
-    'no-js'    =>  \$params->{'no-js'},
+    'help'           =>  \$params->{'help'},
+    'all'            =>  \$params->{'all'},
+    'no-frame'       =>  \$params->{'no-frame'},
+    'no-base-css'    =>  \$params->{'no-base-css'},
+    'ext-css=s'      =>  \$params->{'ext-css'},
+    'ext-js=s'       =>  \$params->{'ext-js'},
     )) {
     die "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
 };
 if ($params->{'help'}) {
     print "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
     print "Options:\n";
-    print "  --all      Include all bibitems, not just those with www_selected set.\n";
-    print "  --help     Print this help.\n";
-    print "  --no-frame Do not print the html header/body frame.\n";
-    print "  --no-css   Do not print any CSS definitions.\n";
-    print "  --no-js    Do not print any JS code.\n";
+    print "  --all              Include all bibitems, not just those with www_selected set.\n";
+    print "  --help             Print this help.\n";
+    print "  --no-frame         Do not print the html header/body frame.\n";
+    print "  --no-base-css      Do not output base CSS definitions.\n";
+    print "  --ext-css=<file>   Print CSS definitions to this file (instead of inline).\n";
+    print "  --ext-js=<file>    Print CSS definitions to this file (instead of inline).\n";
     exit(0);
 };
 
 
 my $tmpdir;
+my $origwd = getcwd();
 END { chdir "/"; File::Path::remove_tree($tmpdir, {verbose => 0}) if defined ($tmpdir); }
 $tmpdir = File::Temp->newdir(CLEANUP => 0);
 
@@ -321,7 +324,7 @@ setup_bib($tmpdir);
 chdir($tmpdir) or die ("Cannot chdir to $tmpdir.\n");
 my $entries = prepare_entries($params);
 
-my $css = << 'EOF';
+my $base_css = << 'EOF';
 .publication:before {
   float:left;
   width:25px;
@@ -458,11 +461,13 @@ my $postamble = << "EOF";
 EOF
 
 
+my $css = '';
+$css .= $base_css unless $params->{'no-base-css'};
 
 print $preamble1 unless $params->{'no-frame'};
-print '<style type="text/css">', $css, '</style>' unless $params->{'no-css'};
+print '<style type="text/css">', $css, '</style>' unless $css eq '';
 print $preamble2 unless $params->{'no-frame'};
-print '<div id="abstract_mask"></div>', "\n" unless $params->{'no-js'} && $params->{'no-frame'};
+print '<div id="abstract_mask"></div>', "\n" unless $params->{'no-frame'};
 my $prev_year = '';
 for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
     my $i = $entries->{$key};
@@ -473,7 +478,20 @@ for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } k
     print $i->{'html'};
 }
 
-print '<script type="text/javascript"> /* <![CDATA[ */', "\n", $js, ' /* ]]> */ </script>', "\n" unless $params->{'no-js'};
+print '<script type="text/javascript"> /* <![CDATA[ */', "\n", $js, ' /* ]]> */ </script>', "\n" unless defined $params->{'ext-js'};
 print $postamble unless $params->{'no-frame'};
 
-# vim:set et ts=4 sw=4 st=4:
+chdir($origwd) or die ("Cannot chdir back to $origwd.\n");
+
+if (defined $params->{'ext-css'}) {
+    open F, ">", $params->{'ext-css'} or die ("Cannot open $params->{'ext-css'} for writing: $!.\n");
+    print F $css;
+    close F;
+}
+if (defined $params->{'ext-js'}) {
+    open F, ">", $params->{'ext-js'} or die ("Cannot open $params->{'ext-js'} for writing: $!.\n");
+    print F $js;
+    close F;
+}
+
+# vim:et:ts=4:sw=4:softtabstop=4:
