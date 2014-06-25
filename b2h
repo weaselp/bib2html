@@ -380,6 +380,7 @@ h2.year {margin-bottom:10px}
 .bibitem a { color:gray; }
 .title { font-weight:bold; }
 .authors { font-variant: small-caps; }
+.fontsmallcaps { font-variant: small-caps; }
 a.doi:before { content: "doi:"; }
 a.doi { color:gray; font-family:"monospace" }
 .misclist a:before { content: "["; }
