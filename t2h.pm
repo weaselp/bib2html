@@ -57,7 +57,7 @@ sub store_extra_css($) {
 
 sub get_extra_css() {
     my @css = ();
-    for my $k (keys %$extra_css) {
+    for my $k (sort {$a cmp $b} keys %$extra_css) {
         my $val = $extra_css->{$k};
         push @css, ".$val { $k }";
     }
