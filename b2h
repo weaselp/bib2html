@@ -115,7 +115,7 @@ my $MONTH2NUMBER = {
 sub htmlize {
     my ($txt) = @_;
 
-    return encode_entities($txt);
+    return encode_entities($txt, '<>&');
 }
 
 sub create_bbl {
