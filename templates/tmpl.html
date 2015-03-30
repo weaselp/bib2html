@@ -1,0 +1,114 @@
+[% UNLESS no_frame %]
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+ PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+ "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Publications</title>
+[% END %]
+[% UNLESS external_css %]
+<style type="text/css">
+[% css %]
+</style>
+[% END %]
+[% UNLESS no_frame %]
+</head>
+<body>
+[% END %]
+<div id="abstract_mask"></div>
+[% lastyear = 0 %]
+
+[% FOREACH publication IN publications %]
+
+[% IF publication.year != lastyear %]
+[% lastyear = publication.year %]
+<h2 class="year">[% publication.year %]</h2>
+[% END %]
+
+<div class="publication [% publication.type %]">
+<div class="bibitem"><a id="[% publication.anchor %]" href="#[% publication.anchor %]">[% publication.bibkey %]</a></div>
+<div class="title">[% publication.title %]</div>
+<div class="authors">[% publication.authors %]</div>
+<div class="info">[% publication.info %]</div>
+
+<ul class="misclist">
+  [% IF publication.abstract %]
+  <li><div class="blocklink" onclick="javascript:block_visible('abstract_[% publication.anchor %]')">abstract</div></li>
+  [% END %]
+  [% IF publication.bibtex %]
+  <li><div class="blocklink" onclick="javascript:block_visible('bibtex_[% publication.anchor %]')">BibTeX</div></li>
+  [% END %]
+  [% FOREACH item IN publication.misc %]
+    [% IF item.raw %]
+      <li>[% item.raw %]</li>
+    [% ELSE %]
+      <li><a class="link" href="[% item.href %]">[% item.label %]</a></li>
+    [% END %]
+  [% END %]
+  [% IF publication.doi %]
+  <li><a class="doi" href="http://dx.doi.org/[% publication.doi %]">[% publication.doi %]</a></li>
+  [% END %]
+</ul>
+
+[% IF publication.abstract %]
+<div id="abstract_[% publication.anchor %]" class="abstract">[% publication.abstract %]</div>
+[% END %]
+[% IF publication.bibtex %]
+<div id="bibtex_[% publication.anchor %]" class="bibtex">[% publication.bibtex %]</div>
+[% END %]
+
+</div>
+<!-- END [% publication.bibkey %] -->
+[% END %]
+
+<script type="text/javascript"> /* <![CDATA[ */
+    hide_blocks();
+    var visible_block = 0;
+
+    function hide_blocks() {
+      all_divs = document.getElementsByTagName("div");
+      for (var i = 0; i < all_divs.length; i++) {
+        if (all_divs[i].className == "blocklink") {
+          all_divs[i].style.display = "inline";
+        } else if (all_divs[i].className == "abstract") {
+          all_divs[i].style.display = "none";
+          all_divs[i].style.position = "absolute";
+          all_divs[i].style.left = "60px";
+          all_divs[i].style.zIndex = 1;
+          all_divs[i].style.border = "#000 1px solid";
+          all_divs[i].style.width = "50%";
+        }
+      }
+    }
+
+    function block_visible(id) {
+      var m = document.getElementById("abstract_mask");
+      if (visible_block) {
+        var t = document.getElementById(visible_block);
+        t.style.display = "none";
+        if (m) {
+          m.style.display = "none";
+        }
+        if (visible_block == id) {
+          visible_block = 0;
+          return;
+        }
+        visible_block = 0;
+      }
+      var e = document.getElementById(id);
+      if (e) {
+         e.style.display = "block";
+         visible_block = id;
+         if (m) {
+           m.onclick = function() { block_visible(id); };
+           m.style.display = "block";
+         }
+      }
+    }
+ /* ]]> */ </script>
+[% UNLESS no_frame %]
+</body>
+</html>
+[% END %]

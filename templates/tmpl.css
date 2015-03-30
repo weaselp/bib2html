@@ -1,0 +1,70 @@
+[% UNLESS no_base_css %]
+.publication:before {
+  float:left;
+  width:25px;
+  margin-left:-25px;
+  font-size:24px;
+  font-weight:bold;
+  content: '\2022';
+}
+.publication { margin: 10px 0 20px 30px; }
+h2.year {margin-bottom:10px}
+#abstract_mask {
+  z-index: 1;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0px;
+  left: 0px;
+  display: none;
+}
+.abstract {
+  padding-left:20px;
+  padding-right:20px;
+  padding-top:10px;
+  padding-bottom:10px;
+  display: block;
+  background-color: #ffffff;
+  /* display: none; */
+  /* position: absolute; */
+  /* left: 60px; */
+  /* z-index: 1; */
+  /* border: #000 1px solid; */
+  /* width: 50%; */
+}
+.bibtex {
+  padding-left:20px;
+  padding-right:20px;
+  padding-top:10px;
+  padding-bottom:10px;
+  display: block;
+  background-color: #ffffff;
+  font-family: "monospace";
+  font-size: small;
+  white-space: pre;
+  display: none;
+  position: absolute;
+  left: 60px;
+  z-index: 1;
+  border: #000 1px solid;
+}
+.blocklink:before { content: "\25BE  "; }
+.blocklink:after { content: ""; }
+.blocklink { color:black; text-decoration:underline; display: none; }
+.bibitem:before { content: "["; }
+.bibitem:after { content: "]"; }
+.bibitem { font-size:small; }
+.bibitem a { color:gray; }
+.title { font-weight:bold; }
+.authors { font-variant: small-caps; }
+.fontsmallcaps { font-variant: small-caps; }
+a.doi:before { content: "doi:"; }
+a.doi { color:gray; font-family:"monospace" }
+.misclist a:before { content: "["; }
+.misclist a:after { content: "]"; }
+ul.misclist { margin: 0 0 0 0; padding-left: 0; }
+ul.misclist li:before { content: "\2014  "; }
+ul.misclist li:first-child:before { content: none; }
+ul.misclist li { display:inline; font-size:small; }
+[% END %]
+[% additional_css %]

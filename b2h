@@ -32,10 +32,14 @@ use Text::BibTeX;
 use HTML::Entities;
 use Getopt::Long;
 use Cwd qw{abs_path getcwd};
+use File::Basename;
+use Template;
 
 use File::Spec::Functions qw( catpath splitpath);
 use lib catpath( ( splitpath( abs_path $0 ) )[ 0, 1 ] );
 use t2h;
+
+my $program_dir_path = dirname(abs_path($0));
 
 package Item;
 
@@ -118,6 +122,7 @@ sub htmlize {
     return encode_entities($txt, '<>&');
 }
 
+# Run LaTeX and BibTeX to create a .bbl file that has LaTeX formatted bibliography items
 sub create_bbl {
     open F, ">", 'dummy.tex' or die ("Cannot open tex file for output: $!\n");
     print F << '    EOF';
@@ -156,8 +161,13 @@ sub sanitize_key($) {
     return $k;
 }
 
+# load the LaTeX formatted bibliography items produced by BibTeX,
+# split them into tokens (ahtors, title, etc.) and convert them to HTML.
+#
+# returns a hash of bibiliography items, each of which is a hash with keys such
+# as title or authors.
 sub html_format_bibs {
-    create_bbl;
+    create_bbl();
     my $bblitems = {};
     open F, "<", 'dummy.bbl' or die ("Cannot open bbl file for input: $!\n");
     {
@@ -182,68 +192,56 @@ sub html_format_bibs {
             my $t2 = shift @tokens;
             my ($bibkey, $authors) = split(/\n/, $t1, 2);
 
-            my $idbibkey = sanitize_key($k);
-            my $lines = [];
-            push @$lines, sprintf('<div class="bibitem"><a id="%s" href="#%s">%s</a></div>', $idbibkey, $idbibkey, trim(tex_to_html($k)));
-            push @$lines, sprintf('<div class="title">%s</div>', trim(tex_to_html($t2)));
-            push @$lines, sprintf('<div class="authors">%s</div>', trim(tex_to_html($authors)));
-            push @$lines, sprintf('<div class="reference-info">%s</div>', trim(tex_to_html(join('\newblock', @tokens))));
-
-            $formatted->{$k} = $lines;
+            $formatted->{$k} = {
+                anchor  => sanitize_key($k),
+                bibkey  => trim(tex_to_html($k)),
+                title   => trim(tex_to_html($t2)),
+                authors => trim(tex_to_html($authors)),
+                info    => trim(tex_to_html(join('\newblock', @tokens))),
+            }
         }
     }
     return $formatted;
 }
 
+# Add additional information to bibliography items that was not included byb
+# BibTeX, such as www links, dois, or abstract.
+#
+# Adds the additional info to the hash referenced in $target.  $entry is
+# an object of class Item (see above) created from the corresponding
+# Text::BibTeX::Entry object.
 sub entry_add_extra_info($$) {
-    my ($base_info, $entry) = @_;
+    my ($target, $entry) = @_;
 
     my $bibtexkey = $entry->key;
-    my @res;
 
     my $type = $entry->type;
     my $idbibkey = sanitize_key($bibtexkey);
-    push @res, "<div class=\"publication $type\">";
-    push @res, @{$base_info};
+
+    $target->{'type'} = $type;
 
     my @misc;
-    if ($entry->exists('abstract')) {
-        push @misc, sprintf('<div class="blocklink" onclick="javascript:block_visible(\'abstract_%s\')">abstract</div>', $idbibkey);
-    };
-    push @misc, sprintf('<div class="blocklink" onclick="javascript:block_visible(\'bibtex_%s\')">BibTeX</div>', $idbibkey);
-
     if ($entry->exists('www_links')) {
         for my $line (split /\s*\|\s*/, $entry->get_plain('www_links')) {
+            my $entry = {};
             my ($desc, $link) = split(/:/, $line, 2);
             if ($desc eq "raw") {
-                push @misc, $link;
+                $entry->{'raw'} = $link;
             } elsif (defined $link) {
-                push @misc, sprintf('<a href="%s">%s</a>', trim(tex_to_html($link)), trim(tex_to_html($desc)));
+                $entry->{'href'} = trim(tex_to_html($link));
+                $entry->{'label'} = trim(tex_to_html($desc));
             } else {
                 warn("Undefined link for $desc in $bibtexkey.\n");
+                next;
             }
+            push @misc, $entry;
         }
     };
-    if ($entry->exists('doi')) {
-        my $doi = $entry->get_plain('doi');
-        push @misc, sprintf('<a class="doi" href="http://dx.doi.org/%s">%s</a>', $doi, $doi);
-    };
 
-    if (scalar @misc) {
-        push @res, '<ul class="misclist">';
-        push @res, map { "<li>$_</li>" } @misc;
-        push @res, '</ul>';
-    };
-
-    if ($entry->exists('abstract')) {
-        push @res, sprintf('<div id="abstract_%s" class="abstract">%s</div>', $idbibkey, $entry->get('abstract'));
-    };
-
-    push @res, sprintf('<div id="bibtex_%s" class="bibtex">%s</div>', $idbibkey, htmlize($entry->print_s()));
-
-    push @res, "</div>\n";
-
-    return join("\n", @res);
+    $target->{'abstract'} = $entry->get('abstract') if ($entry->exists('abstract'));
+    $target->{'doi'} = $entry->get_plain('doi') if ($entry->exists('doi'));
+    $target->{'misc'} = \@misc if (scalar @misc);
+    $target->{'bibtex'} = htmlize($entry->print_s());
 };
 
 sub setup_bib {
@@ -261,58 +259,72 @@ sub open_bib {
     return $b;
 };
 
+# load information about all bibliography entries, running bibtex, parsing
+# its output and extendeding the information as required
 sub prepare_entries {
-    my $bibentries_baseinfo = html_format_bibs;
-    my $bib = open_bib();
     my ($params) = @_;
-    my $entries = {};
+
+    my $bibinfo = html_format_bibs();
+    my $bib = open_bib();
     while (my $entry = new Text::BibTeX::Entry $bib) {
         next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
-        my $h = {};
-
         my $i = new Item($entry);
-        $entries->{$i->key} = $h;
 
         my $is_selected = $i->exists('www_selected') && $i->get_plain('www_selected');
         if (!$params->{'all'} && !$is_selected) {
-            delete $entries->{$i->key};
+            delete $bibinfo->{$i->key};
             next;
-        };
+        }
 
-        my $year = $i->exists('year') ? $i->get_plain('year') : "unspecified";
+        unless (exists $bibinfo->{$i->key}) {
+            warn ("Bibtex key $i->key does not exist in .bbl file\n");
+            next;
+        }
+
+        my $year = $i->exists('year') ? $i->get_plain('year') : 0;
         my $month = $i->exists('month') ? $MONTH2NUMBER->{$i->get_plain('month')} : undef;
         $month = 0 unless defined $month;
-        $h->{'html'} = entry_add_extra_info($bibentries_baseinfo->{$i->key}, $i);
-        $h->{'year'} = $year;
-        $h->{'sort'} = sprintf("%s-%02d-%s", $year, $month, $i->key);
+
+        my $bi = $bibinfo->{$i->key};
+        $bi->{'year'} = $year;
+        $bi->{'sort'} = sprintf("%d-%02d-%s", $year, $month, $i->key);
+
+        entry_add_extra_info($bi, $i);
     }
-    return $entries;
+    return $bibinfo;
 }
 
 
-my $params = {};
+my $params = {
+  'css-template' => $program_dir_path."/templates/tmpl.css",
+  'template'     => $program_dir_path."/templates/tmpl.html",
+};
 Getopt::Long::config('bundling');
 if (!GetOptions (
-    'help'           =>  \$params->{'help'},
+    'help|h'         =>  \$params->{'help'},
     'all'            =>  \$params->{'all'},
     'no-frame'       =>  \$params->{'no-frame'},
     'no-base-css'    =>  \$params->{'no-base-css'},
     'ext-css=s'      =>  \$params->{'ext-css'},
-    'ext-js=s'       =>  \$params->{'ext-js'},
+    'css-template=s' =>  \$params->{'css-template'},
+    'template=s'     =>  \$params->{'template'},
     )) {
     die "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
 };
+
 if ($params->{'help'}) {
     print "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
     print "Options:\n";
-    print "  --all              Include all bibitems, not just those with www_selected set.\n";
-    print "  --help             Print this help.\n";
-    print "  --no-frame         Do not print the html header/body frame.\n";
-    print "  --no-base-css      Do not output base CSS definitions.\n";
-    print "  --ext-css=<file>   Print CSS definitions to this file (instead of inline).\n";
-    print "  --ext-js=<file>    Print CSS definitions to this file (instead of inline).\n";
+    print "  --all                 Include all bibitems, not just those with www_selected set.\n";
+    print "  --ext-css=<file>      Print CSS definitions to this file.\n";
+    print "  --css-template=<file> Use this template for the CSS file [tmpl.css].\n";
+    print "  --template=<file>     Use this template for the main output [tmpl.html].\n";
+    print "  --no-frame            Do not print the html header/body frame [sets a template option].\n";
+    print "  --no-base-css         Do not output base CSS definitions [sets a template option].\n";
+    print "  --help                Print this help.\n";
     exit(0);
 };
+
 
 
 my $tmpdir;
@@ -323,176 +335,34 @@ $tmpdir = File::Temp->newdir(CLEANUP => 0);
 setup_bib($tmpdir);
 chdir($tmpdir) or die ("Cannot chdir to $tmpdir.\n");
 my $entries = prepare_entries($params);
-
-my $base_css = << 'EOF';
-.publication:before {
-  float:left;
-  width:25px;
-  margin-left:-25px;
-  font-size:24px;
-  font-weight:bold;
-  content: '\2022';
-}
-.publication { margin: 10px 0 20px 30px; }
-h2.year {margin-bottom:10px}
-#abstract_mask {
-  z-index: 1;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0px;
-  left: 0px;
-  display: none;
-}
-.abstract {
-  padding-left:20px;
-  padding-right:20px;
-  padding-top:10px;
-  padding-bottom:10px;
-  display: block;
-  background-color: #ffffff;
-  /* display: none; */
-  /* position: absolute; */
-  /* left: 60px; */
-  /* z-index: 1; */
-  /* border: #000 1px solid; */
-  /* width: 50%; */
-}
-.bibtex {
-  padding-left:20px;
-  padding-right:20px;
-  padding-top:10px;
-  padding-bottom:10px;
-  display: block;
-  background-color: #ffffff;
-  font-family: "monospace";
-  font-size: small;
-  white-space: pre;
-  display: none;
-  position: absolute;
-  left: 60px;
-  z-index: 1;
-  border: #000 1px solid;
-}
-.blocklink:before { content: "\25BE  "; }
-.blocklink:after { content: ""; }
-.blocklink { color:black; text-decoration:underline; display: none; }
-.bibitem:before { content: "["; }
-.bibitem:after { content: "]"; }
-.bibitem { font-size:small; }
-.bibitem a { color:gray; }
-.title { font-weight:bold; }
-.authors { font-variant: small-caps; }
-.fontsmallcaps { font-variant: small-caps; }
-a.doi:before { content: "doi:"; }
-a.doi { color:gray; font-family:"monospace" }
-.misclist a:before { content: "["; }
-.misclist a:after { content: "]"; }
-ul.misclist { margin: 0 0 0 0; padding-left: 0; }
-ul.misclist li:before { content: "\2014  "; }
-ul.misclist li:first-child:before { content: none; }
-ul.misclist li { display:inline; font-size:small; }
-EOF
-
-my $preamble1 = << "EOF";
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html
- PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
- "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<title></title>
-EOF
-my $preamble2 = << "EOF";
-</head>
-<body>
-EOF
-
-my $js = << 'EOF';
-    hide_blocks();
-    var visible_block = 0;
-
-    function hide_blocks() {
-      all_divs = document.getElementsByTagName("div");
-      for (var i = 0; i < all_divs.length; i++) {
-        if (all_divs[i].className == "blocklink") {
-          all_divs[i].style.display = "inline";
-        } else if (all_divs[i].className == "abstract") {
-          all_divs[i].style.display = "none";
-          all_divs[i].style.position = "absolute";
-          all_divs[i].style.left = "60px";
-          all_divs[i].style.zIndex = 1;
-          all_divs[i].style.border = "#000 1px solid";
-          all_divs[i].style.width = "50%";
-        }
-      }
-    }
-
-    function block_visible(id) {
-      var m = document.getElementById("abstract_mask");
-      if (visible_block) {
-        var t = document.getElementById(visible_block);
-        t.style.display = "none";
-        if (m) {
-          m.style.display = "none";
-        }
-        if (visible_block == id) {
-          visible_block = 0;
-          return;
-        }
-        visible_block = 0;
-      }
-      var e = document.getElementById(id);
-      if (e) {
-         e.style.display = "block";
-         visible_block = id;
-         if (m) {
-           m.onclick = function() { block_visible(id); };
-           m.style.display = "block";
-         }
-      }
-    }
-EOF
-
-my $postamble = << "EOF";
-</body>
-</html>
-EOF
-
-
-my $css = '';
-$css .= $base_css unless $params->{'no-base-css'};
-$css .= get_extra_css();
-
-print $preamble1 unless $params->{'no-frame'};
-print '<style type="text/css">', $css, '</style>' unless defined $params->{'ext-css'};
-print $preamble2 unless $params->{'no-frame'};
-print '<div id="abstract_mask"></div>', "\n";
-my $prev_year = '';
-for my $key (sort {- ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) } keys %$entries) {
-    my $i = $entries->{$key};
-    if ($prev_year ne $i->{'year'}) {
-        $prev_year = $i->{'year'};
-        print "<h2 class=\"year\">$prev_year</h2>\n";
-    };
-    print $i->{'html'};
-}
-
-print '<script type="text/javascript"> /* <![CDATA[ */', "\n", $js, ' /* ]]> */ </script>', "\n" unless defined $params->{'ext-js'};
-print $postamble unless $params->{'no-frame'};
-
 chdir($origwd) or die ("Cannot chdir back to $origwd.\n");
 
+my @publications = map { $entries->{$_} }
+                       sort { - ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) }
+                       keys %$entries;
+
+
+
+my $external_css = defined $params->{'ext-css'};
+
+my $tmpl_data = {
+    'publications'   => \@publications,
+    'additional_css' => get_extra_css(),
+    'external_css'   => $external_css,
+    'no_frame'       => defined $params->{'no-frame'},
+    'no_base_css'    => defined $params->{'no-base-css'},
+};
+
+my $css;
+my $tt = Template->new(ABSOLUTE => 1);
+$tt->process($params->{'css-template'}, $tmpl_data, \$css) or die $tt->error(), "\n";
+
+$tmpl_data->{'css'} = $css;
 if (defined $params->{'ext-css'}) {
-    open F, ">", $params->{'ext-css'} or die ("Cannot open $params->{'ext-css'} for writing: $!.\n");
+    open (F, '>', $params->{'ext-css'}) or die "Cannot open $params->{'ext-css'}: $!\n";
     print F $css;
-    close F;
-}
-if (defined $params->{'ext-js'}) {
-    open F, ">", $params->{'ext-js'} or die ("Cannot open $params->{'ext-js'} for writing: $!.\n");
-    print F $js;
-    close F;
-}
+    close(F);
+};
+$tt->process($params->{'template'}, $tmpl_data) or die $tt->error(), "\n";
 
 # vim:et:ts=4:sw=4:softtabstop=4:
