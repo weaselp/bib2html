@@ -339,7 +339,8 @@ if ($params->{'help'}) {
     exit(0);
 };
 
-
+die("CSS template $params->{'css-template'} does not exist or is not a file.\n") unless (-f $params->{'css-template'});
+die("Template $params->{'template'} does not exist or is not a file.\n") unless (-f $params->{'template'});
 
 my $tmpdir;
 my $origwd = getcwd();
