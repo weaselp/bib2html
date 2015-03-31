@@ -276,16 +276,21 @@ sub prepare_entries {
         next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
         my $i = new Item($entry);
 
-        my $is_selected = $i->exists('www_selected') && $i->get_plain('www_selected');
-        if (!$params->{'all'} && !$is_selected) {
-            next;
-        }
-        push @bibkeys, $i->key;
         $bibitems{$i->key} = $i;
+
+        my $is_selected = $i->exists('www_selected') && $i->get_plain('www_selected');
+        if ($params->{'all'} || $is_selected) {
+            push @bibkeys, $i->key;
+        }
     };
 
     if (scalar @bibkeys == 0) {
-        die("No bibentries selected!\n");
+        if (!$params->{'all'} && (scalar keys %bibitems > 0)) {
+            warn("No bibentries selected - including all...\n");
+            @bibkeys = keys %bibitems;
+        } else {
+            die("No bibentries selected!\n");
+        }
     }
     my $bblinfo = tex_format_bibs(\@bibkeys);
 
