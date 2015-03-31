@@ -1,0 +1,15 @@
+[% lastyear = 0 %]
+
+[% FOREACH publication IN publications %]
+
+	[% IF publication.year != lastyear %]
+	[% lastyear = publication.year %]
+<h2 class="year">[% publication.year %]</h2>
+	[% END %]
+
+<div class="publication [% publication.type %]">
+<div class="authors">[% publication.authors %]</div>
+<div class="title">[% publication.title %]</div>
+[% publication.info %]
+</div>
+[% END %]

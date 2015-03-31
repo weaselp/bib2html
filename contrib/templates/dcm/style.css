@@ -1,0 +1,96 @@
+@import url(https://fonts.googleapis.com/css?family=Droid+Sans:400,700|Droid+Serif:italic);
+
+html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset,
+form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, canvas,
+details, embed,  figure, figcaption, footer, header, hgroup, menu, nav, output, ruby,
+section, summary, time, mark, audio, video {
+margin: 0;
+padding: 0;
+border: 0;
+font-size: 100%;
+font: inherit;
+vertical-align: baseline;
+}
+article, aside, details, figcaption, figure, footer, header, hgroup, menu, nav, section {
+display: block;
+}
+
+body {
+line-height: 1.25;
+color:#000;
+margin:20px;
+padding:0;
+border:0;
+text-align:left;
+font-size:16px;
+font-family:"Droid Sans", sans-serif;
+font-weight:400;
+}
+
+h1, h2 {
+font-family: "Droid Sans", sans-serif;
+font-weight:400;
+font-style:normal;
+padding:0;
+line-height:1.2em;
+text-shadow: -1px -1px #fff, 1px -1px #fff, -1px 1px #fff, 1px 1px #fff, 0.1em 0.1em 0.3em #444;
+text-align:left;
+}
+
+h1 {
+font-size:26px;
+margin:0 0 16px 0;
+padding:0;
+}
+h2 {
+font-size:20px;
+margin:12px 0 9px 0;
+color:#004080;
+}
+
+.inproceedings:before, .article:before, .misc:before, .mastersthesis:before {
+float:left;
+width:50px;
+margin-left:-50px;
+font-size:24px;
+font-weight:bold;
+text-shadow: -1px -1px #fff, 1px -1px #fff, -1px 1px #fff, 1px 1px #fff, 0.1em 0.1em 0.3em #444;
+}
+.article:before {
+content: "J";
+color:#c00;
+text-indent:4px;
+}
+
+.inproceedings:before {
+content: "C";
+color:#005580;
+}
+.misc:before {
+content: "O";
+color:#888;
+}
+.mastersthesis:before {
+content: "T";
+color:#080;
+}
+.publication .authors {
+font-style:italic;
+font-family:"Droid Serif", serif;
+}
+.publication .title {
+font-family:"Droid Sans", sans-serif;
+font-style:normal;
+font-weight:700;
+color:#005580;
+}
+.publication em {
+font-family:"Droid Sans", sans-serif;
+font-style:normal;
+color:black;
+}
+.publication {
+margin: 0 0 20px 50px;
+}
