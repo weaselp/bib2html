@@ -124,16 +124,18 @@ sub htmlize {
 
 # Run LaTeX and BibTeX to create a .bbl file that has LaTeX formatted bibliography items
 sub create_bbl {
+    my ($bibkeys) = @_;
     open F, ">", 'dummy.tex' or die ("Cannot open tex file for output: $!\n");
-    print F << '    EOF';
+    print F '
     \documentclass{article}
     \bibliographystyle{plain}
     %\bibliographystyle{acm}
     \begin{document}
-    \bibliography{b2h}
-    \nocite{*}
-    \end{document}
-    EOF
+    \bibliography{b2h}';
+    for my $key (@$bibkeys) {
+        print F "\\cite{$key}\n";
+    }
+    print F '\end{document}', "\n";
     close F;
 
     open(my $oldout, ">&STDOUT") or die "Can't dup STDOUT: $!\n";
@@ -166,8 +168,10 @@ sub sanitize_key($) {
 #
 # returns a hash of bibiliography items, each of which is a hash with keys such
 # as title or authors.
-sub html_format_bibs {
-    create_bbl();
+sub tex_format_bibs {
+    my ($bibkeys) = @_;
+    create_bbl($bibkeys);
+
     my $bblitems = {};
     open F, "<", 'dummy.bbl' or die ("Cannot open bbl file for input: $!\n");
     {
@@ -264,35 +268,45 @@ sub open_bib {
 sub prepare_entries {
     my ($params) = @_;
 
-    my $bibinfo = html_format_bibs();
     my $bib = open_bib();
+    my @bibkeys;
+    my %bibitems;
+
     while (my $entry = new Text::BibTeX::Entry $bib) {
         next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
         my $i = new Item($entry);
 
         my $is_selected = $i->exists('www_selected') && $i->get_plain('www_selected');
         if (!$params->{'all'} && !$is_selected) {
-            delete $bibinfo->{$i->key};
             next;
         }
+        push @bibkeys, $i->key;
+        $bibitems{$i->key} = $i;
+    };
 
-        unless (exists $bibinfo->{$i->key}) {
-            warn ("Bibtex key $i->key does not exist in .bbl file\n");
+    my $bblinfo = tex_format_bibs(\@bibkeys);
+
+    for my $bibkey (@bibkeys) {
+        unless (exists $bblinfo->{$bibkey}) {
+            warn ("Bibtex key $bibkey does not exist in .bbl file\n");
             next;
         }
+        my $bi = $bblinfo->{$bibkey};
+        my $i = $bibitems{$bibkey};
+
 
         my $year = $i->exists('year') ? $i->get_plain('year') : 0;
         my $month = $i->exists('month') ? $MONTH2NUMBER->{$i->get_plain('month')} : undef;
         $month = 0 unless defined $month;
 
-        my $bi = $bibinfo->{$i->key};
         $bi->{'year'} = $year;
         $bi->{'sort1'} = sprintf("%d-%02d", $year, $month);
-        $bi->{'sort2'} = $i->key;
+        $bi->{'sort2'} = $bibkey;
 
         entry_add_extra_info($bi, $i);
     }
-    return $bibinfo;
+
+    return $bblinfo;
 }
 
 
