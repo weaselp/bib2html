@@ -125,23 +125,14 @@ sub htmlize {
 # Run LaTeX and BibTeX to create a .bbl file that has LaTeX formatted bibliography items
 sub create_bbl {
     my ($bibkeys) = @_;
-    open F, ">", 'dummy.tex' or die ("Cannot open tex file for output: $!\n");
-    print F '
-    \documentclass{article}
-    \bibliographystyle{plain}
-    %\bibliographystyle{acm}
-    \begin{document}
-    \bibliography{b2h}';
-    for my $key (@$bibkeys) {
-        print F "\\cite{$key}\n";
-    }
-    print F '\end{document}', "\n";
+    open F, ">", 'dummy.aux' or die ("Cannot open aux file for output: $!\n");
+    print F "\\bibstyle{plain}\n\\bibdata{b2h}\n";
+    print F "\\citation{$_}\n" for (@$bibkeys);
     close F;
 
     open(my $oldout, ">&STDOUT") or die "Can't dup STDOUT: $!\n";
     open(STDOUT, '>', "/dev/null") or die "Can't redirect STDOUT: $!\n";
 
-    system(qw{latex dummy}) == 0 or die "latex run failed: $?\n";
     system(qw{bibtex dummy}) == 0 or die "bibtex run failed: $?\n";
 
     open(STDOUT, ">&", $oldout) or die "Can't dup \$oldout: $!";
