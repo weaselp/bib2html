@@ -122,7 +122,7 @@ sub htmlize {
     return encode_entities($txt, '<>&');
 }
 
-# Run LaTeX and BibTeX to create a .bbl file that has LaTeX formatted bibliography items
+# Run BibTeX to create a .bbl file that has LaTeX formatted bibliography items
 sub create_bbl {
     my ($bibkeys) = @_;
     open F, ">", 'dummy.aux' or die ("Cannot open aux file for output: $!\n");
