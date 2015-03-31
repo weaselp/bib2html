@@ -284,6 +284,9 @@ sub prepare_entries {
         $bibitems{$i->key} = $i;
     };
 
+    if (scalar @bibkeys == 0) {
+        die("No bibentries selected!\n");
+    }
     my $bblinfo = tex_format_bibs(\@bibkeys);
 
     for my $bibkey (@bibkeys) {
