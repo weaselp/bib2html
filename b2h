@@ -371,7 +371,7 @@ my $tmpl_data = {
 };
 
 my $css;
-my $tt = Template->new(ABSOLUTE => 1);
+my $tt = Template->new(ABSOLUTE => 1, RELATIVE => 1);
 $tt->process($params->{'css-template'}, $tmpl_data, \$css) or die $tt->error(), "\n";
 $css =~ s/^\n*//;
 $css =~ s/\n\n*/\n/sg;
