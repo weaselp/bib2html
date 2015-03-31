@@ -359,6 +359,8 @@ my $tmpl_data = {
 my $css;
 my $tt = Template->new(ABSOLUTE => 1);
 $tt->process($params->{'css-template'}, $tmpl_data, \$css) or die $tt->error(), "\n";
+$css =~ s/^\n*//;
+$css =~ s/\n\n*/\n/sg;
 
 $tmpl_data->{'css'} = $css;
 if (defined $params->{'ext-css'}) {
@@ -368,6 +370,7 @@ if (defined $params->{'ext-css'}) {
 };
 my $out;
 $tt->process($params->{'template'}, $tmpl_data, \$out) or die $tt->error(), "\n";
+$out =~ s/^\n*//;
 $out =~ s/^\s*$//mg;
 $out =~ s/^\s*</</mg;
 $out =~ s/\n\n*/\n/sg;
