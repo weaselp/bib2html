@@ -2,7 +2,7 @@
 
 # convert bibtex files to html
 
-# Copyright (c) 2014 Peter Palfrader <peter@palfrader.org>
+# Copyright (c) 2014, 2015 Peter Palfrader <peter@palfrader.org>
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -287,7 +287,8 @@ sub prepare_entries {
 
         my $bi = $bibinfo->{$i->key};
         $bi->{'year'} = $year;
-        $bi->{'sort'} = sprintf("%d-%02d-%s", $year, $month, $i->key);
+        $bi->{'sort1'} = sprintf("%d-%02d", $year, $month);
+        $bi->{'sort2'} = $i->key;
 
         entry_add_extra_info($bi, $i);
     }
@@ -338,7 +339,9 @@ my $entries = prepare_entries($params);
 chdir($origwd) or die ("Cannot chdir back to $origwd.\n");
 
 my @publications = map { $entries->{$_} }
-                       sort { - ($entries->{$a}->{'sort'} cmp $entries->{$b}->{'sort'}) }
+                       sort { - ($entries->{$a}->{'sort1'} cmp $entries->{$b}->{'sort1'}) ||
+                                ($entries->{$a}->{'sort2'} cmp $entries->{$b}->{'sort2'})
+                            }
                        keys %$entries;
 
 
@@ -363,6 +366,10 @@ if (defined $params->{'ext-css'}) {
     print F $css;
     close(F);
 };
-$tt->process($params->{'template'}, $tmpl_data) or die $tt->error(), "\n";
-
+my $out;
+$tt->process($params->{'template'}, $tmpl_data, \$out) or die $tt->error(), "\n";
+$out =~ s/^\s*$//mg;
+$out =~ s/^\s*</</mg;
+$out =~ s/\n\n*/\n/sg;
+print $out;
 # vim:et:ts=4:sw=4:softtabstop=4:
