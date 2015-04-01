@@ -35,10 +35,10 @@
 
 <ul class="misclist">
   [% IF publication.abstract %]
-  <li><div class="blocklink" onclick="javascript:block_visible('abstract_[% publication.anchor %]')">abstract</div></li>
+  <li><div class="blocklink" id="link:abstract_[% publication.anchor %]">abstract</div></li>
   [% END %]
   [% IF publication.bibtex %]
-  <li><div class="blocklink" onclick="javascript:block_visible('bibtex_[% publication.anchor %]')">BibTeX</div></li>
+  <li><div class="blocklink" id="link:bibtex_[% publication.anchor %]">BibTeX</div></li>
   [% END %]
   [% FOREACH item IN publication.misc %]
     [% IF item.raw %]
@@ -64,14 +64,12 @@
 [% END %]
 
 <script type="text/javascript"> /* <![CDATA[ */
-    hide_blocks();
-    var visible_block = 0;
-
-    function hide_blocks() {
+    function setup_blocks() {
       all_divs = document.getElementsByTagName("div");
       for (var i = 0; i < all_divs.length; i++) {
         if (all_divs[i].className == "blocklink") {
           all_divs[i].style.display = "inline";
+          all_divs[i].addEventListener('click', function() { block_visible( this.id.substr(5) ); });
         } else if (all_divs[i].className == "abstract") {
           all_divs[i].style.display = "none";
           all_divs[i].style.position = "absolute";
@@ -81,15 +79,19 @@
           all_divs[i].style.width = "50%";
         }
       }
+      var abstract_mask = document.getElementById("abstract_mask");
+      if (abstract_mask) {
+        var height = Math.max(document.body.scrollHeight, document.body.offsetHeight);
+        abstract_mask.style.height=height+"px";
+        abstract_mask.addEventListener('click', function() { block_visible(visible_block); });
+      }
     }
-
     function block_visible(id) {
-      var m = document.getElementById("abstract_mask");
       if (visible_block) {
-        var t = document.getElementById(visible_block);
-        t.style.display = "none";
-        if (m) {
-          m.style.display = "none";
+        t = document.getElementById(visible_block).style.display = "none";
+        var abstract_mask = document.getElementById("abstract_mask");
+        if (abstract_mask) {
+          abstract_mask.style.display = "none";
         }
         if (visible_block == id) {
           visible_block = 0;
@@ -99,14 +101,14 @@
       }
       var e = document.getElementById(id);
       if (e) {
+         document.getElementById('abstract_mask').style.display="block";
          e.style.display = "block";
          visible_block = id;
-         if (m) {
-           m.onclick = function() { block_visible(id); };
-           m.style.display = "block";
-         }
       }
     }
+
+    var visible_block = 0;
+    setup_blocks();
  /* ]]> */ </script>
 [% UNLESS no_frame %]
 </body>
