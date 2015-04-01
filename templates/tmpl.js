@@ -3,7 +3,7 @@ function setup_blocks() {
   for (var i = 0; i < all_divs.length; i++) {
     if (all_divs[i].className == "blocklink") {
       all_divs[i].style.display = "inline";
-      all_divs[i].addEventListener('click', function() { block_visible( this.id.substr(5) ); });
+      all_divs[i].addEventListener('click', function() { block_visible( this.id.substr(this.id.indexOf(":")+1) ); });
     } else if (all_divs[i].className == "abstract") {
       all_divs[i].style.display = "none";
       all_divs[i].style.position = "absolute";
