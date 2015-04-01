@@ -311,6 +311,7 @@ sub prepare_entries {
 
 my $params = {
   'css-template' => $program_dir_path."/templates/tmpl.css",
+  'js-template'  => $program_dir_path."/templates/tmpl.js",
   'template'     => $program_dir_path."/templates/tmpl.html",
 };
 Getopt::Long::config('bundling');
@@ -320,6 +321,7 @@ if (!GetOptions (
     'no-frame'       =>  \$params->{'no-frame'},
     'no-base-css'    =>  \$params->{'no-base-css'},
     'ext-css=s'      =>  \$params->{'ext-css'},
+    'ext-js=s'       =>  \$params->{'ext-js'},
     'css-template=s' =>  \$params->{'css-template'},
     'template=s'     =>  \$params->{'template'},
     )) {
@@ -331,7 +333,9 @@ if ($params->{'help'}) {
     print "Options:\n";
     print "  --all                 Include all bibitems, not just those with www_selected set.\n";
     print "  --ext-css=<file>      Print CSS definitions to this file.\n";
+    print "  --ext-js=<file>       Print JS definitions to this file.\n";
     print "  --css-template=<file> Use this template for the CSS file [tmpl.css].\n";
+    print "  --js-template=<file>  Use this template for the JS file [tmpl.js].\n";
     print "  --template=<file>     Use this template for the main output [tmpl.html].\n";
     print "  --no-frame            Do not print the html header/body frame [sets a template option].\n";
     print "  --no-base-css         Do not output base CSS definitions [sets a template option].\n";
@@ -340,6 +344,7 @@ if ($params->{'help'}) {
 };
 
 die("CSS template $params->{'css-template'} does not exist or is not a file.\n") unless (-f $params->{'css-template'});
+die("JS template $params->{'js-template'} does not exist or is not a file.\n") unless (-f $params->{'js-template'});
 die("Template $params->{'template'} does not exist or is not a file.\n") unless (-f $params->{'template'});
 
 my $tmpdir;
@@ -361,30 +366,34 @@ my @publications = map { $entries->{$_} }
 
 
 my $external_css = defined $params->{'ext-css'};
+my $external_js  = defined $params->{'ext-js'};
 
 my $tmpl_data = {
     'publications'   => \@publications,
     'additional_css' => get_extra_css(),
     'external_css'   => $external_css,
+    'external_js'    => $external_js,
     'no_frame'       => defined $params->{'no-frame'},
     'no_base_css'    => defined $params->{'no-base-css'},
 };
 
-my $css;
-my $tt;
-$tt = Template->new( INCLUDE_PATH => dirname(abs_path($params->{'css-template'})) );
-$tt->process(basename($params->{'css-template'}), $tmpl_data, \$css) or die $tt->error(), "\n";
-$css =~ s/^\n*//;
-$css =~ s/\n\n*/\n/sg;
+for my $type (qw{css js}) {
+    my $data;
+    my $tt = Template->new( INCLUDE_PATH => dirname(abs_path($params->{$type.'-template'})) );
+    $tt->process(basename($params->{$type.'-template'}), $tmpl_data, \$data) or die $tt->error(), "\n";
+    $data =~ s/^\n*//;
+    $data =~ s/\n\n*/\n/sg;
 
-$tmpl_data->{'css'} = $css;
-if (defined $params->{'ext-css'}) {
-    open (F, '>', $params->{'ext-css'}) or die "Cannot open $params->{'ext-css'}: $!\n";
-    print F $css;
-    close(F);
+    $tmpl_data->{$type} = $data;
+    if (defined $params->{'ext-'.$type}) {
+        open (F, '>', $params->{'ext-'.$type}) or die "Cannot open $params->{'ext-'.$type}: $!\n";
+        print F $data;
+        close(F);
+    };
 };
+
 my $out;
-$tt = Template->new( INCLUDE_PATH => dirname(abs_path($params->{'template'})) );
+my $tt = Template->new( INCLUDE_PATH => dirname(abs_path($params->{'template'})) );
 $tt->process(basename($params->{'template'}), $tmpl_data, \$out) or die $tt->error(), "\n";
 $out =~ s/^\n*//;
 $out =~ s/^\s*$//mg;
