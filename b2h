@@ -219,10 +219,11 @@ sub entry_add_extra_info($$) {
     if ($entry->exists('www_links')) {
         for my $line (split /\s*\|\s*/, $entry->get_plain('www_links')) {
             my $entry = {};
-            my ($desc, $link) = split(/:/, $line, 2);
+            my ($desc, $link) = ($line =~ /^((?:\\.|[^\\:])*):(.*)$/);
             if ($desc eq "raw") {
                 $entry->{'raw'} = $link;
-            } elsif (defined $link) {
+            } elsif ($link ne '') {
+                $desc =~ s/\\(.)/$1/g;
                 $entry->{'href'} = trim(tex_to_html($link));
                 $entry->{'label'} = trim(tex_to_html($desc));
             } else {
