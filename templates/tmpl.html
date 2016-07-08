@@ -32,6 +32,9 @@
 <div class="title">[% publication.title %]</div>
 <div class="authors">[% publication.authors %]</div>
 <div class="info">[% publication.info %]</div>
+[% IF publication.www_note %]
+<div class="www_note">[% publication.www_note %]</div>
+[% END %]
 
 <ul class="misclist">
   [% IF publication.abstract %]

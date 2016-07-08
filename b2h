@@ -93,7 +93,7 @@ sub print_s {
         $clone->set($k, $be->get($k));
     }
 
-    $clone->delete(qw{owner timestamp www_links www_selected file abstract});
+    $clone->delete(qw{owner timestamp www_links www_selected www_note file abstract});
     my $s = $clone->print_s;
     $s =~ s/\n*$//;
     return $s;
@@ -234,10 +234,23 @@ sub entry_add_extra_info($$) {
         }
     };
 
+    my $www_note;
+    if ($entry->exists('www_note')) {
+        my ($type, $content) = ($entry->get_plain('www_note') =~ /^([^\\:]*):\s*(.*)\s*$/);
+        if ($type eq "raw") {
+            $www_note = $content;
+        } elsif ($type eq 'tex') {
+            $www_note = trim(tex_to_html($content));
+        } else {
+            warn("www_note is note of type tex or raw in $bibtexkey.\n");
+        }
+    }
+
     $target->{'abstract'} = $entry->get('abstract') if ($entry->exists('abstract'));
     $target->{'doi'} = $entry->get_plain('doi') if ($entry->exists('doi'));
     $target->{'misc'} = \@misc if (scalar @misc);
     $target->{'bibtex'} = htmlize($entry->print_s());
+    $target->{'www_note'} = $www_note if (defined $www_note);
 };
 
 sub setup_bib {
