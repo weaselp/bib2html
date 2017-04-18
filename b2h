@@ -89,7 +89,7 @@ sub print_s {
     $clone->set_metatype(&Text::BibTeX::BTE_REGULAR);
     $clone->set_type($be->type);
     $clone->set_key($be->key);
-    for my $k (@{$be->fieldlist}) {
+    for my $k ($be->fieldlist) {
         $clone->set($k, $be->get($k));
     }
 
