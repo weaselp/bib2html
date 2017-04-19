@@ -93,7 +93,7 @@ sub print_s {
         $clone->set($k, $be->get($k));
     }
 
-    $clone->delete(qw{owner timestamp www_links www_selected www_note www_year file abstract});
+    $clone->delete(qw{owner timestamp www_links www_selected www_note www_year www_month file abstract});
     my $s = $clone->print_s;
     $s =~ s/\n*$//;
     return $s;
@@ -103,18 +103,18 @@ package main;
 
 use constant BIBFILENAME => 'b2h.bib';
 my $MONTH2NUMBER = {
-                'January'   =>  1,
-                'February'  =>  2,
-                'March'     =>  3,
-                'April'     =>  4,
-                'May'       =>  5,
-                'June'      =>  6,
-                'July'      =>  7,
-                'August'    =>  8,
-                'September' =>  9,
-                'October'   => 10,
-                'November'  => 11,
-                'December'  => 12 };
+                'January'   => '01',
+                'February'  => '02',
+                'March'     => '03',
+                'April'     => '04',
+                'May'       => '05',
+                'June'      => '06',
+                'July'      => '07',
+                'August'    => '08',
+                'September' => '09',
+                'October'   => '10',
+                'November'  => '11',
+                'December'  => '12' };
 
 sub htmlize {
     my ($txt) = @_;
@@ -311,11 +311,12 @@ sub prepare_entries {
         my $year = $i->exists('www_year') ? $i->get_plain('www_year') :
                    $i->exists('year') ? $i->get_plain('year') :
                    0;
-        my $month = $i->exists('month') ? $MONTH2NUMBER->{$i->get_plain('month')} : undef;
-        $month = 0 unless defined $month;
+        my $month = 0;
+        $month = $MONTH2NUMBER->{$i->get_plain('www_month')} || $i->get_plain('www_month')if (!$month and $i->exists('www_month'));
+        $month = $MONTH2NUMBER->{$i->get_plain(    'month')} || $i->get_plain(    'month')if (!$month and $i->exists(    'month'));
 
         $bi->{'year'} = $year;
-        $bi->{'sort1'} = sprintf("%d-%02d", $year, $month);
+        $bi->{'sort1'} = sprintf("%d-%s", $year, $month);
         $bi->{'sort2'} = $bibkey;
 
         entry_add_extra_info($bi, $i);
