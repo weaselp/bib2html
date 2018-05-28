@@ -443,6 +443,7 @@ sub tex_to_html($) {
                 | '<'   { '&lt;' }
                 | '>'   { '&gt;' }
                 | '~'   { '&nbsp;' }
+                | '\\%' { '%' }
 
         cmd: '\\' command curlyblock { ::markup($item[2], $item[3]); }
            | '\\' command exprs      { ::markup($item[2], $item[3]); }
