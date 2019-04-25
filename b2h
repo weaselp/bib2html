@@ -334,6 +334,7 @@ my $params = {
 Getopt::Long::config('bundling');
 if (!GetOptions (
     'help|h'         =>  \$params->{'help'},
+    'debug'          =>  \$params->{'debug'},
     'all'            =>  \$params->{'all'},
     'no-frame'       =>  \$params->{'no-frame'},
     'no-base-css'    =>  \$params->{'no-base-css'},
@@ -348,6 +349,7 @@ if (!GetOptions (
 if ($params->{'help'}) {
     print "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
     print "Options:\n";
+    print "  --debug               Do not remove temp files.\n";
     print "  --all                 Include all bibitems, not just those with www_selected set.\n";
     print "  --ext-css=<file>      Print CSS definitions to this file.\n";
     print "  --ext-js=<file>       Print JS definitions to this file.\n";
@@ -360,6 +362,10 @@ if ($params->{'help'}) {
     exit(0);
 };
 
+if ($params->{'debug'}) {
+    $File::Temp::KEEP_ALL = 1;
+}
+
 die("CSS template $params->{'css-template'} does not exist or is not a file.\n") unless (-f $params->{'css-template'});
 die("JS template $params->{'js-template'} does not exist or is not a file.\n") unless (-f $params->{'js-template'});
 die("Template $params->{'template'} does not exist or is not a file.\n") unless (-f $params->{'template'});
@@ -367,7 +373,7 @@ die("Template $params->{'template'} does not exist or is not a file.\n") unless 
 my $tmpdir;
 my $origwd = getcwd();
 END { chdir "/"; File::Path::remove_tree($tmpdir, {verbose => 0}) if defined ($tmpdir); }
-$tmpdir = File::Temp->newdir(CLEANUP => 0);
+$tmpdir = File::Temp->newdir('/tmp/b2h-XXXXXXX', CLEANUP => 0);
 
 setup_bib($tmpdir);
 chdir($tmpdir) or die ("Cannot chdir to $tmpdir.\n");

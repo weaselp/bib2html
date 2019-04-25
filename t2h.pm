@@ -158,7 +158,7 @@ sub pnm_width_height ($) {
 }
 
 
-# compile latex snippet into htmL
+# compile latex snippet into html
 sub math_to_htmlimg ($) {
     my ($tex_snippet) = @_;
 
@@ -170,7 +170,7 @@ sub math_to_htmlimg ($) {
     my $oversample = $render_oversample * $display_oversample;
     my $render_dpi = 96*1.2 * 72.27/72 * $oversample;  # This is 1850.112 dpi.
 
-    my $tmpdir = File::Temp->newdir();
+    my $tmpdir = File::Temp->newdir('/tmp/b2h-XXXXXXX');
     my $file = $tmpdir.'/tth';
 
     (my $tex_input = $TEX_TEMPLATE) =~ s{<SNIPPET>}{$tex_snippet};
