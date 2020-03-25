@@ -278,6 +278,7 @@ sub prepare_entries {
     my %bibitems;
 
     while (my $entry = new Text::BibTeX::Entry $bib) {
+        $entry->print(*STDERR) if $params->{'verbose'};
         next unless $entry->parse_ok && $entry->metatype == BTE_REGULAR;
         my $i = new Item($entry);
 
@@ -335,6 +336,7 @@ Getopt::Long::config('bundling');
 if (!GetOptions (
     'help|h'         =>  \$params->{'help'},
     'debug'          =>  \$params->{'debug'},
+    'verbose'        =>  \$params->{'verbose'},
     'all'            =>  \$params->{'all'},
     'no-frame'       =>  \$params->{'no-frame'},
     'no-base-css'    =>  \$params->{'no-base-css'},
@@ -350,6 +352,7 @@ if ($params->{'help'}) {
     print "$PROGRAM_NAME: Usage: $PROGRAM_NAME [options] <bibfile> [<bibfile> ..]\n";
     print "Options:\n";
     print "  --debug               Do not remove temp files.\n";
+    print "  --verbose             Be more verbose.\n";
     print "  --all                 Include all bibitems, not just those with www_selected set.\n";
     print "  --ext-css=<file>      Print CSS definitions to this file.\n";
     print "  --ext-js=<file>       Print JS definitions to this file.\n";
